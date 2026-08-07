@@ -14,13 +14,13 @@ export default function LoginRoleSelection() {
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-gradient-to-br from-violet-50 via-purple-50 to-violet-100 px-4 py-6 font-sans">
       
-      {/* Decorative Background Circles - Scaled down to match */}
+      {/*Background Circles*/}
       <div className="hidden sm:block absolute w-36 h-36 rounded-full bg-purple-200/40 top-10 left-6 md:left-16" />
       <div className="hidden sm:block absolute w-40 h-40 rounded-full bg-purple-300/30 -top-16 right-10 md:right-32" />
       <div className="hidden sm:block absolute w-24 h-24 rounded-full bg-purple-200/40 bottom-16 left-1/5" />
       <div className="hidden sm:block absolute w-40 h-40 rounded-full bg-purple-300/30 -bottom-20 right-6 md:right-16" />
 
-      {/* Main Structural Card - Reduced to card-sm and max-w-xs */}
+      {/* Main Structural Card*/}
       <div className="card card-sm relative z-10 w-full max-w-[280px] sm:max-w-[300px] bg-violet-50/90 shadow-md rounded-xl">
         <div className="card-body items-center text-center p-4 sm:p-5">
           
@@ -39,7 +39,7 @@ export default function LoginRoleSelection() {
             </svg>
           </div>
 
-          {/* Header Typography - Scaled down */}
+          {/* Header Typography*/}
           <h1 className="text-base font-medium text-violet-950">IMS</h1>
           <p className="text-[8px] font-medium tracking-widest text-violet-800/70 mb-2 text-center uppercase">
             Inventory Management System
@@ -48,10 +48,10 @@ export default function LoginRoleSelection() {
             Please select your role
           </p>
 
-          {/* Role Options - Balanced gaps and sizes */}
+          {/* Role Options*/}
           <div className="grid grid-cols-2 gap-3 w-full mb-1">
             
-            {/* Manager Button */}
+            {/* Manager (oni)*/}
             <button 
               onClick={() => handleRoleSelect('manager')}
               className="btn btn-sm flex flex-col items-center justify-center bg-white hover:bg-violet-100/70 border border-violet-200/60 p-2.5 h-auto min-h-[90px] rounded-xl shadow-xs transition-all duration-200 group text-violet-950"
