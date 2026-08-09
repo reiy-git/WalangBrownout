@@ -1,18 +1,42 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
+import { login } from "../api/auth";
 
-export default function StaffLogin({ onLogin }) {
+export default function StaffLogin() {
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!username.trim() || !password.trim()) {
       setError("Please enter both username and password.");
       return;
     }
+
     setError("");
-    if (onLogin) onLogin({ username, password });
+    setLoading(true);
+
+    try {
+      const data = await login({
+        email: username.trim(),
+        password: password,
+      });
+
+      // Backend returns the auth token and user object.
+      localStorage.setItem("authToken", data.token);
+      localStorage.setItem("authUser", JSON.stringify(data.user));
+
+      // After login, redirect the user to the dashboard.
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,7 +76,7 @@ export default function StaffLogin({ onLogin }) {
           <form className="w-full flex flex-col gap-2.5 text-left" onSubmit={handleSubmit} noValidate>
             <div>
               <label className="text-[11px] font-medium text-violet-900/80 mb-0.5 block" htmlFor="username">
-                Username
+                Email
               </label>
               
               <div className="input input-sm w-full flex items-center gap-2 h-8 px-2.5">
@@ -62,12 +86,12 @@ export default function StaffLogin({ onLogin }) {
                 </svg>
                 <input
                   id="username"
-                  type="text"
+                  type="email"
                   className="grow min-w-0 text-xs"
-                  placeholder="Enter your username"
+                  placeholder="Enter your email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
+                  autoComplete="email"
                 />
               </div>
             </div>
