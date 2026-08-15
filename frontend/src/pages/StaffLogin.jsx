@@ -6,16 +6,16 @@ export default function StaffLogin({ onLogin }) {
   const [error, setError] = useState("");
 
   const handleSubmit = (e) => {
-  e.preventDefault();
-  if (!username.trim() || !password.trim()) {
-    setError("Please enter both username and password.");
-    return;
-  }
-  setError("");
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      setError("Please enter both username and password.");
+      return;
+    }
+    setError("");
 
-  // Simulate successful authentication and route to the dashboard
-  navigate("/manager-dashboard");
-};
+    // Simulate successful authentication and route to the dashboard
+    navigate("/manager-dashboard");
+  };
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-gradient-to-br from-violet-50 via-purple-50 to-violet-100 px-4 py-6">
@@ -25,10 +25,10 @@ export default function StaffLogin({ onLogin }) {
       <div className="hidden sm:block absolute w-24 h-24 rounded-full bg-purple-200/40 bottom-16 left-1/5" />
       <div className="hidden sm:block absolute w-40 h-40 rounded-full bg-purple-300/30 -bottom-20 right-6 md:right-16" />
 
-      
+
       <div className="card card-sm relative z-10 w-full max-w-[280px] sm:max-w-[300px] bg-violet-50/90 shadow-md rounded-xl">
         <div className="card-body items-center text-center p-4 sm:p-5">
-          
+
           <div className="mb-1 w-11 h-11 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" fill="url(#boxGradient)" stroke="#ffffff" strokeWidth="0.5" />
@@ -56,7 +56,7 @@ export default function StaffLogin({ onLogin }) {
               <label className="text-[11px] font-medium text-violet-900/80 mb-0.5 block" htmlFor="username">
                 Username
               </label>
-              
+
               <div className="input input-sm w-full flex items-center gap-2 h-8 px-2.5">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                   <path d="M12 12c2.5 0 4.5-2 4.5-4.5S14.5 3 12 3 7.5 5 7.5 7.5 9.5 12 12 12z" stroke="#9a8cc2" strokeWidth="1.5" />
@@ -78,7 +78,7 @@ export default function StaffLogin({ onLogin }) {
               <label className="text-[11px] font-medium text-violet-900/80 mb-0.5 block" htmlFor="password">
                 Password
               </label>
-              
+
               <div className="input input-sm w-full flex items-center gap-2 h-8 px-2.5">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                   <rect x="5" y="11" width="14" height="9" rx="2" stroke="#9a8cc2" strokeWidth="1.5" />
