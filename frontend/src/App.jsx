@@ -1,7 +1,7 @@
 import React from "react";
 import { Routes, Route } from "react-router";
 import LoginRoleSelection from "./pages/LoginRoleSelection";
-import StaffLogin from "./pages/StaffLogin"; 
+import StaffLogin from "./pages/StaffLogin";
 import LoginPage from "./pages/LoginPage";
 import ManagerDashboard from "./pages/ManagerDashboard";
 
@@ -13,16 +13,16 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Landing view forces selection of access level */}
+      {/* Landing / Role Selection Page */}
       <Route path="/" element={<LoginRoleSelection />} />
-      
-      {/* Staff Login Route */}
+
+      {/* Staff Login path */}
       <Route path="/login" element={<StaffLogin />} />
-      
-      {/* Manager Login Route (using your teammate's incoming file) */}
+
+      {/* Manager Login path (LoginPage component) */}
       <Route path="/manager-login" element={<LoginPage onLogin={handleLogin} />} />
-      
-      {/* Manager Dashboard view */}
+
+      {/* Manager Dashboard path */}
       <Route path="/manager-dashboard" element={<ManagerDashboard />} />
     </Routes>
   );

@@ -14,17 +14,14 @@
     "flyonui": "^2.4.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-<<<<<<< HEAD
     "react-router": "^8.3.0",
-=======
->>>>>>> 7da4d49d016decbc6c485e6d77e20ab0a099183a
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
-    "oxlint": "^1.75.0",
+    "oxlint": "^1.7.5",
     "vite": "^8.2.0"
   }
 }

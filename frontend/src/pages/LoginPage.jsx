@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
-export default function StaffLogin({ onLogin }) {
+export default function LoginPage({ onLogin }) {
+  const navigate = useNavigate(); // <-- 1. Add this line inside the component
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -12,7 +15,11 @@ export default function StaffLogin({ onLogin }) {
       return;
     }
     setError("");
+    
     if (onLogin) onLogin({ username, password });
+
+    // This redirects the manager straight to the dashboard!
+    navigate("/manager-dashboard"); 
   };
 
   return (
