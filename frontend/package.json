@@ -14,7 +14,10 @@
     "flyonui": "^2.4.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+<<<<<<< HEAD
     "react-router": "^8.3.0",
+=======
+>>>>>>> 7da4d49d016decbc6c485e6d77e20ab0a099183a
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
