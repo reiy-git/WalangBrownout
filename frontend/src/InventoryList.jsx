@@ -33,6 +33,9 @@ export default function InventoryList({ items = products, onAddProduct, onView, 
   const [showFilters, setShowFilters] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [rdProduct, setRdProduct] = useState(null);
+  const [rdMode, setRdMode] = useState("Receive");
+  const [rdQty, setRdQty] = useState("");
   const totalPages = 3;
 
   const categoryOptions = [...new Set(productList.map((p) => p.category))];
@@ -87,6 +90,32 @@ export default function InventoryList({ items = products, onAddProduct, onView, 
     setProductList((prev) => [...prev, newProduct]);
     onAddProduct && onAddProduct(newProduct);
     setShowAddModal(false);
+  };
+
+  const openRdModal = (item) => {
+    setRdProduct(item);
+    setRdMode("Receive");
+    setRdQty("");
+  };
+
+  const closeRdModal = () => setRdProduct(null);
+
+  const handleRdSubmit = (e) => {
+    e.preventDefault();
+    const qty = Number(rdQty);
+    if (!qty || qty <= 0) return;
+
+    setProductList((prev) =>
+      prev.map((p) => {
+        if (p.name !== rdProduct.name) return p;
+        const newStock =
+          rdMode === "Receive" ? p.stock + qty : Math.max(0, p.stock - qty);
+        return { ...p, stock: newStock, status: getStatus(newStock) };
+      })
+    );
+
+    onReceiveDispatch && onReceiveDispatch({ ...rdProduct, mode: rdMode, quantity: qty });
+    setRdProduct(null);
   };
 
   return (
@@ -221,7 +250,7 @@ export default function InventoryList({ items = products, onAddProduct, onView, 
                       <td className="py-3">
                         <button
                           type="button"
-                          onClick={() => onReceiveDispatch && onReceiveDispatch(item)}
+                          onClick={() => openRdModal(item)}
                           className="btn btn-xs bg-purple-400 hover:bg-purple-500 text-white rounded-full h-6 min-h-[24px] text-[10px] px-3 border-0"
                         >
                           Receive/Dispatch
@@ -401,6 +430,72 @@ export default function InventoryList({ items = products, onAddProduct, onView, 
                 className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white rounded-full w-full mt-2 h-9 min-h-[36px] text-xs border-0"
               >
                 Add Product
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Receive/Dispatch Modal */}
+      {rdProduct && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={closeRdModal}
+        >
+          <div
+            className="bg-white rounded-xl shadow-lg w-full max-w-sm p-5 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={closeRdModal}
+              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+
+            <h2 className="text-base font-semibold text-gray-900 mb-1 uppercase">{rdProduct.name}</h2>
+            <p className="text-xs text-gray-500 mb-4">Current stock: {rdProduct.stock}</p>
+
+            <form onSubmit={handleRdSubmit} className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRdMode("Receive")}
+                  className={`flex-1 h-9 rounded-lg text-xs font-medium border
+                    ${rdMode === "Receive" ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-200 text-gray-600"}`}
+                >
+                  Receive
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRdMode("Dispatch")}
+                  className={`flex-1 h-9 rounded-lg text-xs font-medium border
+                    ${rdMode === "Dispatch" ? "bg-red-500 border-red-500 text-white" : "border-gray-200 text-gray-600"}`}
+                >
+                  Dispatch
+                </button>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Quantity</label>
+                <input
+                  type="number"
+                  value={rdQty}
+                  onChange={(e) => setRdQty(e.target.value)}
+                  min="1"
+                  required
+                  className="w-full h-9 px-3 text-xs border border-gray-200 rounded-lg outline-none focus:border-purple-400"
+                  placeholder="0"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white rounded-full w-full mt-2 h-9 min-h-[36px] text-xs border-0"
+              >
+                Confirm {rdMode}
               </button>
             </form>
           </div>
