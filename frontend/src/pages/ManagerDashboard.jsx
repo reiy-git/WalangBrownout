@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router';
 
 export default function ManagerDashboard() {
   const navigate = useNavigate();
-  // State to handle showing and hiding the sidebar menu when clicked
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     navigate("/");
   };
 
-  // Recent Transactions
   const transactions = [
     { date: "07-29-2026", type: "Dispatch", id: "10-450-56", name: "Air Condition", qty: 67, amount: "$100,000.00" },
     { date: "07-29-2026", type: "Dispatch", id: "10-460-42", name: "Air Purifiers", qty: 50, amount: "$70,000.00" },
@@ -18,35 +16,33 @@ export default function ManagerDashboard() {
     { date: "07-29-2026", type: "Dispatch", id: "10-465-42", name: "Air Filters", qty: 30, amount: "$40,000.00" }
   ];
 
+  const menuItems = [
+    { name: "Dashboard", icon: "🏠", path: "/manager-dashboard" },
+    { name: "Inventory List", icon: "📋", path: "/inventory-list" },
+    { name: "Reorder Points", icon: "🛒", path: "/reorder-points" },
+    { name: "Users", icon: "👥", path: "/users" },
+    { name: "Reports", icon: "📄", path: "/reports" }
+  ];
+
   return (
     <div className="min-h-screen flex bg-[#ede9fe]/30 font-sans relative overflow-hidden">
       
-      {/*Closes the sidebar menu when you click outside of it*/}
+      {/* BACKGROUND DIMMER */}
       {isSidebarOpen && (
-        <div 
-          onClick={() => setIsSidebarOpen(false)} 
-          className="fixed inset-0 bg-black/30 z-20 transition-opacity duration-300"
-        />
+        <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 transition-opacity duration-300" />
       )}
 
-      {/* SLIDE-IN SIDEBAR MENU */}
-      <aside 
-        className={`fixed top-0 bottom-0 left-0 bg-[#8b7fd6] border-r border-[#ddd6fe] w-64 p-4 z-30 shadow-2xl flex flex-col transition-transform duration-300 transform ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {/* Sidebar Header */}
+      {/* SIDEBAR MENU */}
+      <aside className={`fixed top-0 bottom-0 left-0 bg-[#8b7fd6] border-r border-[#ddd6fe] w-64 p-4 z-30 shadow-2xl flex flex-col transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between mb-8 px-1">
           <div className="flex items-center gap-3">
-            {/* White-tinted circle container */}
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-sm">
-              {/* login card view */}
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://w3.org">
-                <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" fill="url(#sidebarBoxGradient)" stroke="#ffffff" strokeWidth="0.5" />
+                <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" fill="url(#dashBoxGrad)" stroke="#ffffff" strokeWidth="0.5" />
                 <path d="M12 2L21 7L12 12L3 7L12 2Z" fill="#ffffff" fillOpacity="0.35" />
                 <path d="M12 12V22" stroke="#ffffff" strokeWidth="0.6" strokeOpacity="0.5" />
                 <defs>
-                  <linearGradient id="sidebarBoxGradient" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+                  <linearGradient id="dashBoxGrad" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
                     <stop stopColor="#8B7FD6" />
                     <stop offset="1" stopColor="#5B4FBF" />
                   </linearGradient>
@@ -55,22 +51,20 @@ export default function ManagerDashboard() {
             </div>
             <span className="font-bold text-xl text-[#2e1065] tracking-wide">IMS</span>
           </div>
-          {/* Close Button Inside Sidebar */}
           <button onClick={() => setIsSidebarOpen(false)} className="btn btn-sm btn-ghost btn-circle text-[#2e1065]">✕</button>
         </div>
 
-        {/* Sidebar Navigation Items List */}
         <nav className="flex flex-col gap-4 flex-1">
-          {["Dashboard", "Inventory List", "Reorder Points", "Users", "Reports"].map((item, idx) => (
-            <button key={idx} className={`flex items-center gap-4 text-[#2e1065] font-medium py-2.5 px-4 rounded-xl text-left w-full ${idx === 0 ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'}`}>
-              <span className="text-lg shrink-0">
-                {idx === 0 && "🏠"}
-                {idx === 1 && "📋"}
-                {idx === 2 && "🛒"}
-                {idx === 3 && "👥"}
-                {idx === 4 && "📄"}
-              </span>
-              <span className="text-sm font-semibold">{item}</span>
+          {menuItems.map((item, idx) => (
+            <button 
+              key={idx} 
+              onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
+              className={`flex items-center gap-4 text-[#2e1065] font-medium py-2.5 px-4 rounded-xl text-left w-full transition-all duration-150 ${
+                item.name === "Dashboard" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
+              }`}
+            >
+              <span className="text-lg shrink-0">{item.icon}</span>
+              <span className="text-sm font-semibold">{item.name}</span>
             </button>
           ))}
         </nav>

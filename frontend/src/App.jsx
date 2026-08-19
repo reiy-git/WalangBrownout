@@ -1,29 +1,23 @@
-import React from "react";
-import { Routes, Route } from "react-router";
-import LoginRoleSelection from "./pages/LoginRoleSelection";
-import StaffLogin from "./pages/StaffLogin";
-import LoginPage from "./pages/LoginPage";
-import ManagerDashboard from "./pages/ManagerDashboard";
+import React from 'react';
+import { Routes, Route } from 'react-router'; 
+import LoginRoleSelection from './pages/LoginRoleSelection';
+import LoginPage from './pages/LoginPage';
+import StaffLogin from './pages/StaffLogin';
+import ManagerDashboard from './pages/ManagerDashboard';
+import ManagerInventoryList from './pages/ManagerInventoryList'; 
+import ManagerInventoryAddProduct from './pages/ManagerInventoryAddProduct';
+import ManagerProductDetails from './pages/ManagerProductDetails';
 
 export default function App() {
-  //ate marriyell login app.jsx
-  const handleLogin = ({ username, password }) => {
-    console.log(username, password);
-  };
-
   return (
     <Routes>
-      {/* Landing / Role Selection Page */}
       <Route path="/" element={<LoginRoleSelection />} />
-
-      {/* Staff Login path */}
       <Route path="/login" element={<StaffLogin />} />
-
-      {/* Manager Login path (LoginPage component) */}
-      <Route path="/manager-login" element={<LoginPage onLogin={handleLogin} />} />
-
-      {/* Manager Dashboard path */}
+      <Route path="/manager-login" element={<LoginPage />} />
       <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+      <Route path="/inventory-list" element={<ManagerInventoryList />} /> 
+      <Route path="/manager-inventory-add-product" element={<ManagerInventoryAddProduct />} />
+      <Route path="/product-details/:name" element={<ManagerProductDetails />} />
     </Routes>
   );
 }
