@@ -8,6 +8,8 @@ import ManagerInventoryList from './pages/ManagerInventoryList';
 import ManagerInventoryAddProduct from './pages/ManagerInventoryAddProduct';
 import ManagerProductDetails from './pages/ManagerProductDetails';
 import ManagerEditProduct from './pages/ManagerEditProduct';
+import ManagerReceiveProduct from './pages/ManagerReceiveProduct';
+import ManagerDispatchProduct from './pages/ManagerDispatchProduct';
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
       <Route path="/manager-inventory-add-product" element={<ManagerInventoryAddProduct />} />
       <Route path="/product-details/:id" element={<ManagerProductDetails />} />
       <Route path="/edit-product/:id" element={<ManagerEditProduct />} />
+      <Route path="/receive-product/:id" element={<ManagerReceiveProduct />} />
+      <Route path="/dispatch-product/:id" element={<ManagerDispatchProduct />} />
     </Routes>
   );
 }

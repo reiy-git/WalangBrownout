@@ -14,9 +14,8 @@ function computeStatus(stock, reorderPoint) {
 function loadProducts() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
-    try { return JSON.parse(raw); } catch { /* reseed */ }
+    try { return JSON.parse(raw); } catch { /* fall through */ }
   }
-  
   const legacyCustom = JSON.parse(localStorage.getItem("customProducts") || "[]");
   const baseProducts = [
     { name: "Air Condition", category: "Appliances", stock: 67, reorderPoint: 20, price: "", description: "", image: null },
@@ -39,11 +38,6 @@ function loadProducts() {
   return merged;
 }
 
-function saveProducts(products) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-}
-// ------------------------------------------------------
-
 export default function ManagerInventoryList() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -56,14 +50,11 @@ export default function ManagerInventoryList() {
 
   const [rawProducts, setRawProducts] = useState([]);
 
-  // Receive/Dispatch modal state
-  const [activeProduct, setActiveProduct] = useState(null);
-  const [quantityInput, setQuantityInput] = useState("");
-
-  const refresh = () => setRawProducts(loadProducts());
+  // Receive/Dispatch CHOICE modal state
+  const [choiceProduct, setChoiceProduct] = useState(null);
 
   useEffect(() => {
-    refresh();
+    setRawProducts(loadProducts());
   }, []);
 
   const products = useMemo(
@@ -109,26 +100,6 @@ export default function ManagerInventoryList() {
     { name: "Users", icon: "👥", path: "/users" },
     { name: "Reports", icon: "📄", path: "/reports" }
   ];
-
-  const openReceiveDispatch = (product) => {
-    setActiveProduct(product);
-    setQuantityInput("");
-  };
-  const closeModal = () => { setActiveProduct(null); setQuantityInput(""); };
-
-  const applyStockChange = (direction) => {
-    const qty = Number(quantityInput);
-    if (!qty || qty <= 0) return;
-    const currentStock = Number(activeProduct.stock) || 0;
-    const newStock = direction === "receive" ? currentStock + qty : Math.max(0, currentStock - qty);
-
-    const updated = rawProducts.map((p) =>
-      p.id === activeProduct.id ? { ...p, stock: newStock } : p
-    );
-    saveProducts(updated);
-    setRawProducts(updated);
-    closeModal();
-  };
 
   return (
     <div className="min-h-screen flex bg-[#ede9fe]/30 font-sans relative overflow-hidden">
@@ -311,7 +282,7 @@ export default function ManagerInventoryList() {
                         </td>
                         <td className="py-4 text-center">
                           <button
-                            onClick={() => openReceiveDispatch(p)}
+                            onClick={() => setChoiceProduct(p)}
                             className="btn btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-[#2e1065] font-semibold px-4 rounded-md"
                           >
                             Receive/Dispatch
@@ -357,39 +328,32 @@ export default function ManagerInventoryList() {
         </main>
       </div>
 
-      {activeProduct && (
+      {/* Receive/Dispatch CHOICE modal */}
+      {choiceProduct && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-[#2e1065] mb-1">Receive / Dispatch Stock</h2>
-            <p className="text-xs text-[#2e1065]/60 mb-4">{activeProduct.name} — current stock: {activeProduct.stock}</p>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <h2 className="text-lg font-bold text-[#2e1065] mb-1">Receive or Dispatch?</h2>
+            <p className="text-xs text-[#2e1065]/60 mb-6">
+              What would you like to do with <span className="font-semibold">{choiceProduct.name}</span>?
+            </p>
 
-            <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Quantity</label>
-            <input
-              type="number"
-              min="1"
-              value={quantityInput}
-              onChange={(e) => setQuantityInput(e.target.value)}
-              placeholder="Enter quantity"
-              className="input input-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] mb-5 focus:outline-none focus:border-[#8b7fd6]"
-            />
-
-            <div className="flex gap-3 mb-3">
+            <div className="flex flex-col gap-3 mb-3">
               <button
-                onClick={() => applyStockChange("receive")}
-                className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white font-medium rounded-lg"
+                onClick={() => navigate(`/receive-product/${choiceProduct.id}`)}
+                className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium rounded-lg py-2"
               >
-                + Receive
+                Receive Product
               </button>
               <button
-                onClick={() => applyStockChange("dispatch")}
-                className="btn btn-sm flex-1 bg-rose-500 hover:bg-rose-600 border-0 text-white font-medium rounded-lg"
+                onClick={() => navigate(`/dispatch-product/${choiceProduct.id}`)}
+                className="btn btn-sm bg-[#5B4FBF] hover:bg-[#4c3fb0] border-0 text-white font-medium rounded-lg py-2"
               >
-                − Dispatch
+                Dispatch Product
               </button>
             </div>
 
             <button
-              onClick={closeModal}
+              onClick={() => setChoiceProduct(null)}
               className="btn btn-sm w-full bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium rounded-lg"
             >
               Cancel
