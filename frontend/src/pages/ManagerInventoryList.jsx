@@ -1,42 +1,78 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
-export default function InventoryList() {
+const STORAGE_KEY = "ims_products";
+
+function computeStatus(stock, reorderPoint) {
+  const s = Number(stock) || 0;
+  const r = Number(reorderPoint) || 0;
+  if (s <= 0) return "Out Of Stock";
+  if (s <= r) return "Low Stock";
+  return "In stock";
+}
+
+function loadProducts() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try { return JSON.parse(raw); } catch { /* reseed */ }
+  }
+  
+  const legacyCustom = JSON.parse(localStorage.getItem("customProducts") || "[]");
+  const baseProducts = [
+    { name: "Air Condition", category: "Appliances", stock: 67, reorderPoint: 20, price: "", description: "", image: null },
+    { name: "Air Purifiers", category: "Appliances", stock: 50, reorderPoint: 15, price: "", description: "", image: null },
+    { name: "Air Filters", category: "Accessories", stock: 30, reorderPoint: 10, price: "", description: "", image: null },
+    { name: "Air Condition Split Type", category: "Appliances", stock: 12, reorderPoint: 15, price: "26500", description: "1.5HP Split Type Air Conditioner\nEnergy efficient cooling for homes and offices.", image: null },
+    { name: "Air Condition (Premium)", category: "Appliances", stock: 0, reorderPoint: 10, price: "", description: "", image: null }
+  ];
+  const merged = [...baseProducts, ...legacyCustom].map((p, idx) => ({
+    id: p.id || `p${idx + 1}`,
+    name: p.name,
+    category: p.category || "",
+    stock: Number(p.stock) || 0,
+    reorderPoint: Number(p.reorderPoint) || 0,
+    price: p.price || "",
+    description: p.description || "",
+    image: p.image || null,
+  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+  return merged;
+}
+
+function saveProducts(products) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+}
+// ------------------------------------------------------
+
+export default function ManagerInventoryList() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  // Search input tracking state
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Filter dropdown open/close state
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef(null);
-
-  // Active filter values
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  // Products array matching your exact screen items
-  const [customProducts, setCustomProducts] = useState([]);
+  const [rawProducts, setRawProducts] = useState([]);
+
+  // Receive/Dispatch modal state
+  const [activeProduct, setActiveProduct] = useState(null);
+  const [quantityInput, setQuantityInput] = useState("");
+
+  const refresh = () => setRawProducts(loadProducts());
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("customProducts") || "[]");
-    setCustomProducts(saved);
+    refresh();
   }, []);
 
-  const baseProducts = [
-    { name: "Air Condition", category: "Appliances", stock: 67, status: "In stock" },
-    { name: "Air Purifiers", category: "Appliances", stock: 50, status: "In stock" },
-    { name: "Air Filters", category: "Accessories", stock: 30, status: "In stock" },
-    { name: "Air Condition Split Type", category: "Appliances", stock: 12, status: "Low Stock" },
-    { name: "Air Condition (Premium)", category: "Appliances", stock: 0, status: "Out Of Stock" }
-  ];
+  const products = useMemo(
+    () => rawProducts.map((p) => ({ ...p, status: computeStatus(p.stock, p.reorderPoint) })),
+    [rawProducts]
+  );
 
-  const products = [...baseProducts, ...customProducts];
-
-  // Derive unique category/status options straight from the data
   const categoryOptions = useMemo(
-    () => ["All", ...new Set(products.map((p) => p.category))],
+    () => ["All", ...new Set(products.map((p) => p.category).filter(Boolean))],
     [products]
   );
   const statusOptions = useMemo(
@@ -44,43 +80,27 @@ export default function InventoryList() {
     [products]
   );
 
-  // Combined search + filter logic
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      const matchesSearch = p.name
-        .toLowerCase()
-        .includes(searchTerm.trim().toLowerCase());
-      const matchesCategory =
-        categoryFilter === "All" || p.category === categoryFilter;
-      const matchesStatus =
-        statusFilter === "All" || p.status === statusFilter;
-
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.trim().toLowerCase());
+      const matchesCategory = categoryFilter === "All" || p.category === categoryFilter;
+      const matchesStatus = statusFilter === "All" || p.status === statusFilter;
       return matchesSearch && matchesCategory && matchesStatus;
     });
   }, [products, searchTerm, categoryFilter, statusFilter]);
 
-  const activeFilterCount =
-    (categoryFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
+  const activeFilterCount = (categoryFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
+  const clearFilters = () => { setCategoryFilter("All"); setStatusFilter("All"); };
 
-  const clearFilters = () => {
-    setCategoryFilter("All");
-    setStatusFilter("All");
-  };
-
-  // Close the filter dropdown when clicking outside of it
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) {
-        setIsFilterOpen(false);
-      }
+      if (filterRef.current && !filterRef.current.contains(e.target)) setIsFilterOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    navigate("/");
-  };
+  const handleLogout = () => navigate("/");
 
   const menuItems = [
     { name: "Dashboard", icon: "🏠", path: "/manager-dashboard" },
@@ -90,15 +110,33 @@ export default function InventoryList() {
     { name: "Reports", icon: "📄", path: "/reports" }
   ];
 
+  const openReceiveDispatch = (product) => {
+    setActiveProduct(product);
+    setQuantityInput("");
+  };
+  const closeModal = () => { setActiveProduct(null); setQuantityInput(""); };
+
+  const applyStockChange = (direction) => {
+    const qty = Number(quantityInput);
+    if (!qty || qty <= 0) return;
+    const currentStock = Number(activeProduct.stock) || 0;
+    const newStock = direction === "receive" ? currentStock + qty : Math.max(0, currentStock - qty);
+
+    const updated = rawProducts.map((p) =>
+      p.id === activeProduct.id ? { ...p, stock: newStock } : p
+    );
+    saveProducts(updated);
+    setRawProducts(updated);
+    closeModal();
+  };
+
   return (
     <div className="min-h-screen flex bg-[#ede9fe]/30 font-sans relative overflow-hidden">
 
-      {/* BACKGROUND DIMMER */}
       {isSidebarOpen && (
         <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 transition-opacity duration-300" />
       )}
 
-      {/* SIDEBAR MENU */}
       <aside className={`fixed top-0 bottom-0 left-0 bg-[#8b7fd6] border-r border-[#ddd6fe] w-64 p-4 z-30 shadow-2xl flex flex-col transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between mb-8 px-1">
           <div className="flex items-center gap-3">
@@ -125,8 +163,9 @@ export default function InventoryList() {
             <button
               key={idx}
               onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
-              className={`flex items-center gap-4 text-[#2e1065] font-medium py-2.5 px-4 rounded-xl text-left w-full transition-all duration-150 ${item.name === "Inventory List" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
-                }`}
+              className={`flex items-center gap-4 text-[#2e1065] font-medium py-2.5 px-4 rounded-xl text-left w-full transition-all duration-150 ${
+                item.name === "Inventory List" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
+              }`}
             >
               <span className="text-lg shrink-0">{item.icon}</span>
               <span className="text-sm font-semibold">{item.name}</span>
@@ -135,10 +174,8 @@ export default function InventoryList() {
         </nav>
       </aside>
 
-      {/* MAIN APPLICATION WORKSPACE AREA */}
       <div className="flex-1 flex flex-col min-w-0 w-full">
 
-        {/* Top Navbar */}
         <div className="navbar bg-[#e9d5ff] border-b border-[#ddd6fe] px-4 sm:px-6 shadow-xs flex justify-between items-center relative z-10">
           <button onClick={() => setIsSidebarOpen(true)} className="btn btn-ghost btn-square text-[#2e1065] hover:bg-[#c4b5fd]/30">
             <svg xmlns="http://w3.org" fill="none" viewBox="0 0 24 24" className="inline-block w-5 h-5" stroke="#6b5ba8" strokeWidth="2">
@@ -157,10 +194,8 @@ export default function InventoryList() {
           </div>
         </div>
 
-        {/* WORKSPACE WRAPPER */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full pb-12 flex-1 flex flex-col">
 
-          {/* Header Action Section */}
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">Inventory List</h1>
             <button
@@ -171,9 +206,7 @@ export default function InventoryList() {
             </button>
           </div>
 
-          {/* Controls Bar Row */}
           <div className="flex gap-4 items-center mb-6 relative">
-            {/* Search Input Control */}
             <div className="relative max-w-xs w-full">
               <input
                 type="text"
@@ -195,7 +228,6 @@ export default function InventoryList() {
               )}
             </div>
 
-            {/* Filter Toggle Action */}
             <div className="relative" ref={filterRef}>
               <button
                 onClick={() => setIsFilterOpen((prev) => !prev)}
@@ -209,44 +241,32 @@ export default function InventoryList() {
                 )}
               </button>
 
-              {/* Filter Dropdown Panel */}
               {isFilterOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-[#d8b4fe]/60 rounded-xl shadow-lg p-4 z-40">
                   <div className="mb-3">
-                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">
-                      Category
-                    </label>
+                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Category</label>
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
                       className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
                     >
-                      {categoryOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
+                      {categoryOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
 
                   <div className="mb-4">
-                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">
-                      Status
-                    </label>
+                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Status</label>
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
                     >
-                      {statusOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
+                      {statusOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <button
-                      onClick={clearFilters}
-                      className="text-[11px] font-semibold text-[#8b7fd6] hover:text-[#6b5ba8]"
-                    >
+                    <button onClick={clearFilters} className="text-[11px] font-semibold text-[#8b7fd6] hover:text-[#6b5ba8]">
                       Clear Filters
                     </button>
                     <button
@@ -261,7 +281,6 @@ export default function InventoryList() {
             </div>
           </div>
 
-          {/* Table Container Card Component */}
           <div className="bg-[#ede9fe]/40 border border-[#ddd6fe]/70 rounded-2xl p-4 sm:p-5 shadow-xs flex-1 flex flex-col justify-between">
             <div className="overflow-x-auto bg-[#ffffff] rounded-xl shadow-xs border border-[#d8b4fe]/50">
               <table className="table table-md w-full text-left">
@@ -277,30 +296,37 @@ export default function InventoryList() {
                 </thead>
                 <tbody className="text-sm font-medium text-[#2e1065]">
                   {filteredProducts.length > 0 ? (
-                    filteredProducts.map((p, index) => (
-                      <tr key={index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/20 transition-colors">
+                    filteredProducts.map((p) => (
+                      <tr key={p.id} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/20 transition-colors">
                         <td className="py-4 pl-6 text-[#2e1065]">{p.name}</td>
                         <td className="py-4 text-[#4c1d95]/80">{p.category}</td>
                         <td className="py-4 text-[#4c1d95]/90">{p.stock}</td>
                         <td className="py-4">
-                          <span className={`font-semibold ${p.status === 'In stock' ? 'text-emerald-600' :
-                              p.status === 'Low Stock' ? 'text-amber-500' : 'text-rose-500'
-                            }`}>
+                          <span className={`font-semibold ${
+                            p.status === 'In stock' ? 'text-emerald-600' :
+                            p.status === 'Low Stock' ? 'text-amber-500' : 'text-rose-500'
+                          }`}>
                             {p.status}
                           </span>
                         </td>
                         <td className="py-4 text-center">
-                          <button className="btn btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-[#2e1065] font-semibold px-4 rounded-md">
+                          <button
+                            onClick={() => openReceiveDispatch(p)}
+                            className="btn btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-[#2e1065] font-semibold px-4 rounded-md"
+                          >
                             Receive/Dispatch
                           </button>
                         </td>
                         <td className="py-4 text-center pr-6">
-                          <div className="flex justify-center gap-2">
-                            <button className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased">
+                         <div className="flex justify-center gap-2">
+                            <button
+                              onClick={() => navigate(`/edit-product/${p.id}`)}
+                              className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased"
+                            >
                               🖋︎
                             </button>
                             <button
-                              onClick={() => navigate(`/product-details/${encodeURIComponent(p.name)}`)}
+                              onClick={() => navigate(`/product-details/${p.id}`)}
                               className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased"
                             >
                               👁︎
@@ -320,7 +346,6 @@ export default function InventoryList() {
               </table>
             </div>
 
-            {/* Pagination Controls Section */}
             <div className="flex justify-end gap-1.5 mt-5">
               <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">‹</button>
               <button className="btn btn-square btn-xs bg-[#c4b5fd] border-0 text-xs text-[#2e1065] font-bold">1</button>
@@ -328,10 +353,50 @@ export default function InventoryList() {
               <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">3</button>
               <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">›</button>
             </div>
-
           </div>
         </main>
       </div>
+
+      {activeProduct && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-[#2e1065] mb-1">Receive / Dispatch Stock</h2>
+            <p className="text-xs text-[#2e1065]/60 mb-4">{activeProduct.name} — current stock: {activeProduct.stock}</p>
+
+            <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Quantity</label>
+            <input
+              type="number"
+              min="1"
+              value={quantityInput}
+              onChange={(e) => setQuantityInput(e.target.value)}
+              placeholder="Enter quantity"
+              className="input input-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] mb-5 focus:outline-none focus:border-[#8b7fd6]"
+            />
+
+            <div className="flex gap-3 mb-3">
+              <button
+                onClick={() => applyStockChange("receive")}
+                className="btn btn-sm flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white font-medium rounded-lg"
+              >
+                + Receive
+              </button>
+              <button
+                onClick={() => applyStockChange("dispatch")}
+                className="btn btn-sm flex-1 bg-rose-500 hover:bg-rose-600 border-0 text-white font-medium rounded-lg"
+              >
+                − Dispatch
+              </button>
+            </div>
+
+            <button
+              onClick={closeModal}
+              className="btn btn-sm w-full bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium rounded-lg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -7,6 +7,7 @@ import ManagerDashboard from './pages/ManagerDashboard';
 import ManagerInventoryList from './pages/ManagerInventoryList'; 
 import ManagerInventoryAddProduct from './pages/ManagerInventoryAddProduct';
 import ManagerProductDetails from './pages/ManagerProductDetails';
+import ManagerEditProduct from './pages/ManagerEditProduct';
 
 export default function App() {
   return (
@@ -15,9 +16,10 @@ export default function App() {
       <Route path="/login" element={<StaffLogin />} />
       <Route path="/manager-login" element={<LoginPage />} />
       <Route path="/manager-dashboard" element={<ManagerDashboard />} />
-      <Route path="/inventory-list" element={<ManagerInventoryList />} /> 
+      <Route path="/inventory-list" element={<ManagerInventoryList />} />
       <Route path="/manager-inventory-add-product" element={<ManagerInventoryAddProduct />} />
-      <Route path="/product-details/:name" element={<ManagerProductDetails />} />
+      <Route path="/product-details/:id" element={<ManagerProductDetails />} />
+      <Route path="/edit-product/:id" element={<ManagerEditProduct />} />
     </Routes>
   );
 }
