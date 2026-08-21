@@ -1,0 +1,23 @@
+{
+	"servers": {
+		"flyonui-mcp": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"flyonui-mcp"
+			],
+			"env": {
+				"API_KEY": "${input:apiKey}"
+			},
+			"type": "stdio"
+		}
+	},
+	"inputs": [
+		{
+			"type": "promptString",
+			"id": "apiKey",
+			"description": "Your License Key",
+			"password": true
+		}
+	]
+}
