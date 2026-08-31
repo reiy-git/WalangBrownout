@@ -1,17 +1,10 @@
-// File: StaffViewProfile.jsx
+
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import PhotoCropModal from "./PhotoCropModal";
 
-// Drop this into src/StaffViewProfile.jsx
-// Assumes DashboardLayout.jsx already renders the top navbar + main nav Sidebar.
-// This component is just the page content for a "/profile" route.
-// Styled to match StaffLogin.jsx (violet/purple tokens, input input-sm + icon pattern, card card-sm).
 
-// Turns the raw login username into placeholder profile data.
-// The username is the one real thing we know (typed on the login page);
-// everything else here is a placeholder until you have a real backend record.
 function buildProfileFromUsername(username) {
   const clean = (username || "").trim();
 

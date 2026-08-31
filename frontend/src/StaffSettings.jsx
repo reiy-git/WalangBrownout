@@ -1,9 +1,5 @@
-// File: StaffSettings.jsx
 import { useState } from "react";
 
-// Drop this into src/StaffSettings.jsx
-// Assumes DashboardLayout.jsx already renders the top navbar + main nav Sidebar.
-// Styled to match StaffViewProfile.jsx / StaffLogin.jsx (violet/purple tokens, input input-sm + icon pattern).
 
 const defaultForm = {
   username: "",
