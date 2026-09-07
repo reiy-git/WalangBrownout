@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { login } from "../api/auth";
 
 export default function LoginPage({ onLogin }) {
   const navigate = useNavigate(); // <-- 1. Add this line inside the component
@@ -7,19 +8,29 @@ export default function LoginPage({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError("Please enter both username and password.");
+      setError("Please enter both email and password.");
       return;
     }
     setError("");
-    
-    if (onLogin) onLogin({ username, password });
 
-    // This redirects the manager straight to the dashboard!
-    navigate("/manager-dashboard"); 
+    setIsSubmitting(true);
+    login({ email: username, password })
+      .then((data) => {
+        if (data.user?.role !== "manager") {
+          throw new Error("This account is not authorized for manager login.");
+        }
+
+        localStorage.setItem("auth_token", data.token);
+        if (onLogin) onLogin(data.user);
+        navigate("/manager-dashboard");
+      })
+      .catch((loginError) => setError(loginError.message))
+      .finally(() => setIsSubmitting(false));
   };
 
   return (
@@ -29,8 +40,6 @@ export default function LoginPage({ onLogin }) {
       <div className="hidden sm:block absolute w-40 h-40 rounded-full bg-purple-300/30 -top-16 right-10 md:right-32" />
       <div className="hidden sm:block absolute w-24 h-24 rounded-full bg-purple-200/40 bottom-16 left-1/5" />
       <div className="hidden sm:block absolute w-40 h-40 rounded-full bg-purple-300/30 -bottom-20 right-6 md:right-16" />
-
-      
       <div className="card card-sm relative z-10 w-full max-w-[280px] sm:max-w-[300px] bg-violet-50/90 shadow-md rounded-xl">
         <div className="card-body items-center text-center p-4 sm:p-5">
           
@@ -59,7 +68,7 @@ export default function LoginPage({ onLogin }) {
           <form className="w-full flex flex-col gap-2.5 text-left" onSubmit={handleSubmit} noValidate>
             <div>
               <label className="text-[11px] font-medium text-violet-900/80 mb-0.5 block" htmlFor="username">
-                Username
+                Email
               </label>
               
               <div className="input input-sm w-full flex items-center gap-2 h-8 px-2.5">
@@ -71,7 +80,7 @@ export default function LoginPage({ onLogin }) {
                   id="username"
                   type="text"
                   className="grow min-w-0 text-xs"
-                  placeholder="Enter your username"
+                  placeholder="Enter your email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
@@ -104,8 +113,8 @@ export default function LoginPage({ onLogin }) {
             {error && <p className="text-error text-[11px] text-center mt-0.5">{error}</p>}
 
             {/* login*/}
-            <button type="submit" className="btn btn-primary btn-sm rounded-full w-full h-8 min-h-[32px] mt-1 text-xs">
-              Login
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary btn-sm rounded-full w-full h-8 min-h-[32px] mt-1 text-xs">
+              {isSubmitting ? "Signing in..." : "Login"}
             </button>
           </form>
 

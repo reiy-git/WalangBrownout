@@ -1,20 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { getDashboardData } from '../api/dashboard';
 
 export default function ManagerDashboard() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [dashboard, setDashboard] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    getDashboardData()
+      .then(setDashboard)
+      .catch((dashboardError) => setError(dashboardError.message));
+  }, []);
 
   const handleLogout = () => {
+    localStorage.removeItem('auth_token');
     navigate("/");
   };
-
-  const transactions = [
-    { date: "07-29-2026", type: "Dispatch", id: "10-450-56", name: "Air Condition", qty: 67, amount: "$100,000.00" },
-    { date: "07-29-2026", type: "Dispatch", id: "10-460-42", name: "Air Purifiers", qty: 50, amount: "$70,000.00" },
-    { date: "07-29-2026", type: "Receive", id: "10-460-42", name: "Air Condition", qty: 100, amount: "$180,000.00" },
-    { date: "07-29-2026", type: "Dispatch", id: "10-465-42", name: "Air Filters", qty: 30, amount: "$40,000.00" }
-  ];
 
   const menuItems = [
     { name: "Dashboard", icon: "🏠", path: "/manager-dashboard" },
@@ -97,32 +100,30 @@ export default function ManagerDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full">
           <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065] mb-6">Dashboard Summary</h1>
 
+          {error && (
+            <div className="alert alert-error mb-6 text-sm" role="alert">
+              {error}
+            </div>
+          )}
+
           {/* Summary Cards*/}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-8">
-            <div className="bg-[#ede9fe] border border-[#ddd6fe]/70 shadow-xs rounded-xl p-4 flex flex-col items-center justify-center text-center">
-              <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">Total Products</span>
-              <div className="text-2xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1">632</div>
-            </div>
-
-            <div className="bg-[#ede9fe] border border-[#ddd6fe]/70 shadow-xs rounded-xl p-4 flex flex-col items-center justify-center text-center">
-              <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">Low Stock Items</span>
-              <div className="text-2xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1">199</div>
-            </div>
-
-            <div className="bg-[#ede9fe] border border-[#ddd6fe]/70 shadow-xs rounded-xl p-4 flex flex-col items-center justify-center text-center">
-              <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">Reorders Alerts</span>
-              <div className="text-2xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1">39</div>
-            </div>
-
-            <div className="bg-[#ede9fe] border border-[#ddd6fe]/70 shadow-xs rounded-xl p-4 flex flex-col items-center justify-center text-center">
-              <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">Total Active User</span>
-              <div className="text-2xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1">98</div>
-            </div>
-
-            <div className="bg-[#ede9fe] border border-[#ddd6fe]/70 shadow-xs rounded-xl p-4 flex flex-col items-center justify-center text-center col-span-2 sm:col-span-1">
-              <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">Today Reports</span>
-              <div className="text-2xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1">31</div>
-            </div>
+            {[
+              dashboard?.summary?.summary_item_1,
+              dashboard?.summary?.summary_item_2,
+              dashboard?.summary?.summary_item_3,
+              dashboard?.summary?.summary_item_4,
+              dashboard?.summary?.summary_item_5,
+            ].map((item, index) => (
+              <div key={index} className={`bg-[#ede9fe] border border-[#ddd6fe]/70 shadow-xs rounded-xl p-4 flex flex-col items-center justify-center text-center ${index === 4 ? 'col-span-2 sm:col-span-1' : ''}`}>
+                <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">
+                  {item?.label || 'Loading...'}
+                </span>
+                <div className="text-2xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1">
+                  {item?.value ?? '—'}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Lower Content Layout */}
@@ -144,55 +145,60 @@ export default function ManagerDashboard() {
                     </tr>
                   </thead>
                   <tbody className="text-xs text-[#4c1d95]">
-                    {transactions.map((t, index) => (
-                      <tr key={index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30">
-                        <td className="py-3 font-medium">{t.date}</td>
-                        <td className={`py-3 font-semibold ${t.type === 'Receive' ? 'text-emerald-600' : 'text-amber-500'}`}>{t.type}</td>
-                        <td className="py-3 text-[#4c1d95]/80 font-mono">{t.id}</td>
-                        <td className="py-3 font-medium">{t.name}</td>
-                        <td className="py-3 text-center font-semibold">{t.qty}</td>
-                        <td className="py-3 text-right font-semibold text-[#2e1065]">{t.amount}</td>
+                    {(dashboard?.panel1 || []).map((transaction, index) => (
+                      <tr key={`${transaction.batch_number}-${transaction.timestamp}-${index}`} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30">
+                        <td className="py-3 font-medium">{transaction.timestamp ? new Date(transaction.timestamp).toLocaleString() : '—'}</td>
+                        <td className={`py-3 font-semibold ${transaction.transaction_type === 'stock_in' ? 'text-emerald-600' : 'text-amber-500'}`}>{transaction.transaction_type}</td>
+                        <td className="py-3 text-[#4c1d95]/80 font-mono">{transaction.sku || '—'}</td>
+                        <td className="py-3 font-medium">{transaction.product_name || '—'}</td>
+                        <td className="py-3 text-center font-semibold">{transaction.quantity}</td>
+                        <td className="py-3 text-right font-semibold text-[#2e1065]">{transaction.batch_number || '—'}</td>
                       </tr>
                     ))}
+                    {!dashboard?.panel1?.length && (
+                      <tr><td colSpan="6" className="py-8 text-center text-xs">No recent stock movements.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Top Categories Chart Section */}
+            {/* Dashboard Alerts */}
             <div className="lg:col-span-5 bg-[#ede9fe] border border-[#ddd6fe]/70 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col">
-              <h2 className="text-sm sm:text-base font-bold text-[#2e1065] mb-4">Top Categories</h2>
-              
-              <div className="bg-[#ffffff] rounded-xl p-6 flex flex-1 items-center justify-around border border-[#d8b4fe]/50 shadow-xs gap-4">
-                <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center shrink-0">
-                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                    <circle cx="18" cy="18" r="15.91" fill="none" stroke="url(#dashGradient)" strokeWidth="4.2" strokeDasharray="40 100" strokeDashoffset="0" />
-                    <circle cx="18" cy="18" r="15.91" fill="none" stroke="#8b5cf6" strokeWidth="4.2" strokeDasharray="35 100" strokeDashoffset="-40" />
-                    <circle cx="18" cy="18" r="15.91" fill="none" stroke="#d8b4fe" strokeWidth="4.2" strokeDasharray="25 100" strokeDashoffset="-75" />
-                    <circle cx="18" cy="18" r="11.5" fill="#ffffff" />
-                    <defs>
-                      <linearGradient id="dashGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#8B7FD6" />
-                        <stop offset="100%" stopColor="#5B4FBF" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
+              <h2 className="text-sm sm:text-base font-bold text-[#2e1065] mb-4">Alerts</h2>
 
-                <div className="flex flex-col gap-3 text-xs font-semibold text-[#2e1065]">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-3 h-3 rounded-full bg-[#8B7FD6] shrink-0" />
-                    <span>Category A</span>
+              <div className="bg-[#ffffff] rounded-xl p-4 flex-1 border border-[#d8b4fe]/50 shadow-xs space-y-5 overflow-y-auto">
+                <section>
+                  <h3 className="text-xs font-bold text-[#4c1d95] mb-2">Reorder Alerts</h3>
+                  <div className="space-y-2">
+                    {(dashboard?.reorderAlerts || []).map((alert) => (
+                      <div key={alert.sku} className="flex items-center justify-between gap-3 text-xs border-b border-[#d8b4fe]/30 pb-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{alert.name}</p>
+                          <p className="text-[#4c1d95]/70">{alert.sku} · {alert.current_stock} / {alert.reorder_point}</p>
+                        </div>
+                        <span className={`badge badge-sm shrink-0 ${alert.alert_level === 'critical' ? 'badge-error' : 'badge-warning'}`}>
+                          {alert.alert_level}
+                        </span>
+                      </div>
+                    ))}
+                    {!dashboard?.reorderAlerts?.length && <p className="text-xs">No reorder alerts.</p>}
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-3 h-3 rounded-full bg-[#8b5cf6] shrink-0" />
-                    <span>Category B</span>
+                </section>
+
+                <section>
+                  <h3 className="text-xs font-bold text-[#4c1d95] mb-2">Expiring Soon · FIFO</h3>
+                  <div className="space-y-2">
+                    {(dashboard?.expiryAlerts || []).map((alert) => (
+                      <div key={alert.batch_number} className="text-xs border-b border-[#d8b4fe]/30 pb-2">
+                        <p className="font-semibold">{alert.product_name}</p>
+                        <p className="text-[#4c1d95]/70">{alert.batch_number} · {alert.quantity_remaining} remaining</p>
+                        <p className="text-amber-600">Expires {alert.expiry_date}</p>
+                      </div>
+                    ))}
+                    {!dashboard?.expiryAlerts?.length && <p className="text-xs">No expiry alerts.</p>}
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-3 h-3 rounded-full bg-[#d8b4fe] shrink-0" />
-                    <span>Category C</span>
-                  </div>
-                </div>
+                </section>
               </div>
             </div>
 
