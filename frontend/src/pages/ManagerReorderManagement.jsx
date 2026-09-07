@@ -2,86 +2,87 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
 const STORAGE_KEY = "ims_products";
+const PAGE_SIZE = 5;
 
-function computeStatus(stock, reorderPoint) {
-  const s = Number(stock) || 0;
-  const r = Number(reorderPoint) || 0;
-  if (s <= 0) return "Out Of Stock";
-  if (s <= r) return "Low Stock";
-  return "In stock";
+function ensureRopFields(p) {
+  const safetyStock = p.safetyStock ?? 10;
+  const leadTimeDemand = p.leadTimeDemand ?? Math.max(0, (Number(p.reorderPoint) || 20) - safetyStock);
+  const reorderPoint = leadTimeDemand + safetyStock;
+  return {
+    ...p,
+    safetyStock,
+    leadTimeDemand,
+    reorderPoint,
+    supplier: p.supplier || "N/A",
+    lastReorderDate: p.lastReorderDate || "N/A",
+  };
 }
 
 function loadProducts() {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    try { return JSON.parse(raw); } catch { /* fall through */ }
-  }
-  const legacyCustom = JSON.parse(localStorage.getItem("customProducts") || "[]");
-  const baseProducts = [
-    { name: "Air Condition", category: "Appliances", stock: 67, reorderPoint: 20, price: "", description: "", image: null },
-    { name: "Air Purifiers", category: "Appliances", stock: 50, reorderPoint: 15, price: "", description: "", image: null },
-    { name: "Air Filters", category: "Accessories", stock: 30, reorderPoint: 10, price: "", description: "", image: null },
-    { name: "Air Condition Split Type", category: "Appliances", stock: 12, reorderPoint: 15, price: "26500", description: "1.5HP Split Type Air Conditioner\nEnergy efficient cooling for homes and offices.", image: null },
-    { name: "Air Condition (Premium)", category: "Appliances", stock: 0, reorderPoint: 10, price: "", description: "", image: null }
-  ];
-  const merged = [...baseProducts, ...legacyCustom].map((p, idx) => ({
-    id: p.id || `p${idx + 1}`,
-    name: p.name,
-    category: p.category || "",
-    stock: Number(p.stock) || 0,
-    reorderPoint: Number(p.reorderPoint) || 0,
-    price: p.price || "",
-    description: p.description || "",
-    image: p.image || null,
-  }));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-  return merged;
+  let products = raw ? JSON.parse(raw) : [];
+  let changed = false;
+  products = products.map((p) => {
+    if (p.safetyStock === undefined || p.leadTimeDemand === undefined || p.supplier === undefined || p.lastReorderDate === undefined) {
+      changed = true;
+      return ensureRopFields(p);
+    }
+    return p;
+  });
+  if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+  return products;
 }
 
-export default function ManagerInventoryList() {
+function getRopStatus(stock, rop) {
+  const s = Number(stock) || 0;
+  const r = Number(rop) || 1;
+  if (s <= r) return "Low";
+  if (s <= r * 1.5) return "Medium";
+  return "High";
+}
+
+export default function ManagerReorderManagement() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef(null);
-  const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [rawProducts, setRawProducts] = useState([]);
-
-  // Receive/Dispatch CHOICE modal state
-  const [choiceProduct, setChoiceProduct] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setRawProducts(loadProducts());
   }, []);
 
   const products = useMemo(
-    () => rawProducts.map((p) => ({ ...p, status: computeStatus(p.stock, p.reorderPoint) })),
+    () => rawProducts.map((p) => ({ ...p, ropStatus: getRopStatus(p.stock, p.reorderPoint) })),
     [rawProducts]
   );
 
-  const categoryOptions = useMemo(
-    () => ["All", ...new Set(products.map((p) => p.category).filter(Boolean))],
-    [products]
-  );
-  const statusOptions = useMemo(
-    () => ["All", ...new Set(products.map((p) => p.status))],
-    [products]
-  );
+  const lowCount = products.filter((p) => p.ropStatus === "Low").length;
+  const mediumCount = products.filter((p) => p.ropStatus === "Medium").length;
+  const highCount = products.filter((p) => p.ropStatus === "High").length;
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const matchesSearch = p.name.toLowerCase().includes(searchTerm.trim().toLowerCase());
-      const matchesCategory = categoryFilter === "All" || p.category === categoryFilter;
-      const matchesStatus = statusFilter === "All" || p.status === statusFilter;
-      return matchesSearch && matchesCategory && matchesStatus;
+      const matchesStatus = statusFilter === "All" || p.ropStatus === statusFilter;
+      return matchesSearch && matchesStatus;
     });
-  }, [products, searchTerm, categoryFilter, statusFilter]);
+  }, [products, searchTerm, statusFilter]);
 
-  const activeFilterCount = (categoryFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
-  const clearFilters = () => { setCategoryFilter("All"); setStatusFilter("All"); };
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -100,6 +101,11 @@ export default function ManagerInventoryList() {
     { name: "Users", icon: "👥", path: "/users" },
     { name: "Reports", icon: "📄", path: "/reports" }
   ];
+
+  const statusBadgeClass = (status) =>
+    status === "Low" ? "bg-rose-500 text-white" :
+    status === "Medium" ? "bg-amber-400 text-white" :
+    "bg-emerald-500 text-white";
 
   return (
     <div className="min-h-screen flex bg-[#ede9fe]/30 font-sans relative overflow-hidden">
@@ -135,7 +141,7 @@ export default function ManagerInventoryList() {
               key={idx}
               onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
               className={`flex items-center gap-4 text-[#2e1065] font-medium py-2.5 px-4 rounded-xl text-left w-full transition-all duration-150 ${
-                item.name === "Inventory List" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
+                item.name === "Reorder Points" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
               }`}
             >
               <span className="text-lg shrink-0">{item.icon}</span>
@@ -168,7 +174,7 @@ export default function ManagerInventoryList() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full pb-12 flex-1 flex flex-col">
 
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">Inventory List</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">Reorder</h1>
             <button
               onClick={() => navigate("/manager-inventory-add-product")}
               className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium gap-1 px-3.5 rounded-lg shadow-sm text-xs"
@@ -205,40 +211,28 @@ export default function ManagerInventoryList() {
                 className="btn btn-sm bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/60 border border-[#8b7fd6]/40 text-[#2e1065] gap-1 px-3.5 rounded-lg text-xs font-medium"
               >
                 <span>⏳</span> Filters
-                {activeFilterCount > 0 && (
-                  <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#8b7fd6] text-white text-[10px] font-bold">
-                    {activeFilterCount}
-                  </span>
+                {statusFilter !== "All" && (
+                  <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#8b7fd6] text-white text-[10px] font-bold">1</span>
                 )}
               </button>
 
               {isFilterOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-[#d8b4fe]/60 rounded-xl shadow-lg p-4 z-40">
-                  <div className="mb-3">
-                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Category</label>
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
-                    >
-                      {categoryOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Status</label>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
-                    >
-                      {statusOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
+                <div className="absolute top-full left-0 mt-2 w-56 bg-white border border-[#d8b4fe]/60 rounded-xl shadow-lg p-4 z-40">
+                  <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] mb-4 focus:outline-none focus:border-[#8b7fd6]"
+                  >
+                    <option value="All">All</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
 
                   <div className="flex justify-between items-center">
-                    <button onClick={clearFilters} className="text-[11px] font-semibold text-[#8b7fd6] hover:text-[#6b5ba8]">
-                      Clear Filters
+                    <button onClick={() => setStatusFilter("All")} className="text-[11px] font-semibold text-[#8b7fd6] hover:text-[#6b5ba8]">
+                      Clear Filter
                     </button>
                     <button
                       onClick={() => setIsFilterOpen(false)}
@@ -252,57 +246,93 @@ export default function ManagerInventoryList() {
             </div>
           </div>
 
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <button
+              onClick={() => setStatusFilter(statusFilter === "Low" ? "All" : "Low")}
+              className={`flex items-center gap-3 bg-white border rounded-xl p-4 shadow-xs text-left transition-all ${
+                statusFilter === "Low" ? "border-rose-400 ring-2 ring-rose-200" : "border-[#d8b4fe]/50 hover:border-rose-300"
+              }`}
+            >
+              <div className="w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center text-white text-sm shrink-0">⚠</div>
+              <div>
+                <p className="text-[11px] font-bold text-[#2e1065]/70 uppercase tracking-wide">Low</p>
+                <p className="text-lg font-bold text-[#2e1065]">{lowCount} items</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter(statusFilter === "Medium" ? "All" : "Medium")}
+              className={`flex items-center gap-3 bg-white border rounded-xl p-4 shadow-xs text-left transition-all ${
+                statusFilter === "Medium" ? "border-amber-400 ring-2 ring-amber-200" : "border-[#d8b4fe]/50 hover:border-amber-300"
+              }`}
+            >
+              <div className="w-9 h-9 rounded-full bg-amber-400 flex items-center justify-center text-white text-sm shrink-0">⚠</div>
+              <div>
+                <p className="text-[11px] font-bold text-[#2e1065]/70 uppercase tracking-wide">Medium</p>
+                <p className="text-lg font-bold text-[#2e1065]">{mediumCount} items</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter(statusFilter === "High" ? "All" : "High")}
+              className={`flex items-center gap-3 bg-white border rounded-xl p-4 shadow-xs text-left transition-all ${
+                statusFilter === "High" ? "border-emerald-400 ring-2 ring-emerald-200" : "border-[#d8b4fe]/50 hover:border-emerald-300"
+              }`}
+            >
+              <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm shrink-0">✓</div>
+              <div>
+                <p className="text-[11px] font-bold text-[#2e1065]/70 uppercase tracking-wide">High</p>
+                <p className="text-lg font-bold text-[#2e1065]">{highCount} items</p>
+              </div>
+            </button>
+          </div>
+
+          {/* Table Card */}
           <div className="bg-[#ede9fe]/40 border border-[#ddd6fe]/70 rounded-2xl p-4 sm:p-5 shadow-xs flex-1 flex flex-col justify-between">
             <div className="overflow-x-auto bg-[#ffffff] rounded-xl shadow-xs border border-[#d8b4fe]/50">
               <table className="table table-md w-full text-left">
                 <thead>
                   <tr className="text-[#2e1065] text-sm font-bold border-b border-[#d8b4fe]/50 bg-[#ede9fe]/30">
                     <th className="py-4 pl-6">Product</th>
-                    <th className="py-4">Category</th>
-                    <th className="py-4">Stock</th>
+                    <th className="py-4">Last Reorder Date</th>
+                    <th className="py-4">Current Stock</th>
+                    <th className="py-4">ROP Level</th>
                     <th className="py-4">Status</th>
-                    <th className="py-4 text-center">Receive/Dispatch</th>
-                    <th className="py-4 text-center pr-6">Edit/View</th>
+                    <th className="py-4 text-center pr-6">View</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm font-medium text-[#2e1065]">
-                  {filteredProducts.length > 0 ? (
-                    filteredProducts.map((p) => (
+                  {paginatedProducts.length > 0 ? (
+                    paginatedProducts.map((p) => (
                       <tr key={p.id} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/20 transition-colors">
-                        <td className="py-4 pl-6 text-[#2e1065]">{p.name}</td>
-                        <td className="py-4 text-[#4c1d95]/80">{p.category}</td>
+                        <td className="py-4 pl-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-md bg-[#ede9fe] border border-[#d8b4fe]/60 flex items-center justify-center overflow-hidden shrink-0">
+                              {p.image ? (
+                                <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-[10px] text-[#8b7fd6]">🖼</span>
+                              )}
+                            </div>
+                            <span className="text-[#2e1065]">{p.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 text-[#4c1d95]/80">{p.lastReorderDate}</td>
                         <td className="py-4 text-[#4c1d95]/90">{p.stock}</td>
+                        <td className="py-4 text-[#4c1d95]/90">{p.reorderPoint}</td>
                         <td className="py-4">
-                          <span className={`font-semibold ${
-                            p.status === 'In stock' ? 'text-emerald-600' :
-                            p.status === 'Low Stock' ? 'text-amber-500' : 'text-rose-500'
-                          }`}>
-                            {p.status}
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusBadgeClass(p.ropStatus)}`}>
+                            {p.ropStatus}
                           </span>
                         </td>
-                        <td className="py-4 text-center">
-                          <button
-                            onClick={() => setChoiceProduct(p)}
-                            className="btn btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-[#2e1065] font-semibold px-4 rounded-md"
-                          >
-                            Receive/Dispatch
-                          </button>
-                        </td>
                         <td className="py-4 text-center pr-6">
-                         <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => navigate(`/edit-product/${p.id}`)}
-                              className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased"
-                            >
-                              🖋︎
-                            </button>
-                            <button
-                              onClick={() => navigate(`/product-details/${p.id}`)}
-                              className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased"
-                            >
-                              👁︎
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => navigate(`/reorder-points/${p.id}`)}
+                            className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased mx-auto"
+                          >
+                            👁︎
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -317,51 +347,37 @@ export default function ManagerInventoryList() {
               </table>
             </div>
 
+            {/* Functional Pagination */}
             <div className="flex justify-end gap-1.5 mt-5">
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">‹</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd] border-0 text-xs text-[#2e1065] font-bold">1</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">2</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">3</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">›</button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065] disabled:opacity-40"
+              >
+                ‹
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`btn btn-square btn-xs border-0 text-xs font-bold ${
+                    currentPage === pageNum ? 'bg-[#c4b5fd] text-[#2e1065]' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 text-[#2e1065]'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065] disabled:opacity-40"
+              >
+                ›
+              </button>
             </div>
           </div>
         </main>
       </div>
-
-      {/* Receive/Dispatch CHOICE modal */}
-      {choiceProduct && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-            <h2 className="text-lg font-bold text-[#2e1065] mb-1">Receive or Dispatch?</h2>
-            <p className="text-xs text-[#2e1065]/60 mb-6">
-              What would you like to do with <span className="font-semibold">{choiceProduct.name}</span>?
-            </p>
-
-            <div className="flex flex-col gap-3 mb-3">
-              <button
-                onClick={() => navigate(`/receive-product/${choiceProduct.id}`)}
-                className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium rounded-lg py-2"
-              >
-                Receive Product
-              </button>
-              <button
-                onClick={() => navigate(`/dispatch-product/${choiceProduct.id}`)}
-                className="btn btn-sm bg-[#5B4FBF] hover:bg-[#4c3fb0] border-0 text-white font-medium rounded-lg py-2"
-              >
-                Dispatch Product
-              </button>
-            </div>
-
-            <button
-              onClick={() => setChoiceProduct(null)}
-              className="btn btn-sm w-full bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium rounded-lg"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

@@ -11,6 +11,7 @@ class Product extends Model
     use HasFactory;
 
     protected $fillable = [
+<<<<<<< HEAD
         'name',
         'sku',
         'abc_category',
@@ -22,10 +23,33 @@ class Product extends Model
     /**
      * Get the product batches for the product.
      */
+=======
+        'sku',
+        'name',
+        'unit_cost',
+        'abc_category',
+        'expiry_months',
+        'reorder_point',
+        'safety_stock',
+        'annual_demand',
+        'last_reorder_date',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'unit_cost' => 'decimal:2',
+            'annual_demand' => 'decimal:2',
+            'last_reorder_date' => 'date',
+        ];
+    }
+
+>>>>>>> 3b86ef5c652b696a11b341c3222f577945737d2b
     public function batches(): HasMany
     {
         return $this->hasMany(ProductBatch::class);
     }
+<<<<<<< HEAD
 
     /**
      * Get the active product batches for the product.
@@ -35,3 +59,6 @@ class Product extends Model
         return $this->hasMany(ProductBatch::class)->where('status', 'active');
     }
 }
+=======
+}
+>>>>>>> 3b86ef5c652b696a11b341c3222f577945737d2b

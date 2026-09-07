@@ -1,87 +1,77 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
-const STORAGE_KEY = "ims_products";
+const USERS_KEY = "ims_users";
+const PAGE_SIZE = 5;
 
-function computeStatus(stock, reorderPoint) {
-  const s = Number(stock) || 0;
-  const r = Number(reorderPoint) || 0;
-  if (s <= 0) return "Out Of Stock";
-  if (s <= r) return "Low Stock";
-  return "In stock";
-}
-
-function loadProducts() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+function loadUsers() {
+  const raw = localStorage.getItem(USERS_KEY);
   if (raw) {
     try { return JSON.parse(raw); } catch { /* fall through */ }
   }
-  const legacyCustom = JSON.parse(localStorage.getItem("customProducts") || "[]");
-  const baseProducts = [
-    { name: "Air Condition", category: "Appliances", stock: 67, reorderPoint: 20, price: "", description: "", image: null },
-    { name: "Air Purifiers", category: "Appliances", stock: 50, reorderPoint: 15, price: "", description: "", image: null },
-    { name: "Air Filters", category: "Accessories", stock: 30, reorderPoint: 10, price: "", description: "", image: null },
-    { name: "Air Condition Split Type", category: "Appliances", stock: 12, reorderPoint: 15, price: "26500", description: "1.5HP Split Type Air Conditioner\nEnergy efficient cooling for homes and offices.", image: null },
-    { name: "Air Condition (Premium)", category: "Appliances", stock: 0, reorderPoint: 10, price: "", description: "", image: null }
+  const seedUsers = [
+    { id: "u1", lastName: "Owfler", firstName: "Toni", email: "toniowfler67@gmail.com", role: "Administrator", status: "Inactive", employeeId: "IMS-240-66-12", position: "Administrator", password: "" },
+    { id: "u2", lastName: "Briones", firstName: "Rely", email: "rely.briones@example.com", role: "Manager", status: "Active", employeeId: "IMS-240-66-13", position: "Manager", password: "" },
+    { id: "u3", lastName: "Burgos", firstName: "Marriyell", email: "marriyell.burgos@example.com", role: "Staff", status: "Active", employeeId: "IMS-240-66-14", position: "Inventory Staff", password: "" },
+    { id: "u4", lastName: "Canayong", firstName: "Ron", email: "ron.canayong@example.com", role: "Staff", status: "Active", employeeId: "IMS-240-66-15", position: "Inventory Staff", password: "" },
+    { id: "u5", lastName: "Castillo", firstName: "Angelo", email: "angelo.castillo@example.com", role: "Staff", status: "Active", employeeId: "IMS-240-66-16", position: "Inventory Staff", password: "" },
   ];
-  const merged = [...baseProducts, ...legacyCustom].map((p, idx) => ({
-    id: p.id || `p${idx + 1}`,
-    name: p.name,
-    category: p.category || "",
-    stock: Number(p.stock) || 0,
-    reorderPoint: Number(p.reorderPoint) || 0,
-    price: p.price || "",
-    description: p.description || "",
-    image: p.image || null,
-  }));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-  return merged;
+  localStorage.setItem(USERS_KEY, JSON.stringify(seedUsers));
+  return seedUsers;
 }
 
-export default function ManagerInventoryList() {
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+export default function ManagerUserManagement() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef(null);
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [roleFilter, setRoleFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const [rawProducts, setRawProducts] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Receive/Dispatch CHOICE modal state
-  const [choiceProduct, setChoiceProduct] = useState(null);
+  // Delete confirmation modal state
+  const [userToDelete, setUserToDelete] = useState(null);
 
   useEffect(() => {
-    setRawProducts(loadProducts());
+    setUsers(loadUsers());
   }, []);
 
-  const products = useMemo(
-    () => rawProducts.map((p) => ({ ...p, status: computeStatus(p.stock, p.reorderPoint) })),
-    [rawProducts]
+  const roleOptions = useMemo(
+    () => ["All", ...new Set(users.map((u) => u.role).filter(Boolean))],
+    [users]
   );
+  const statusOptions = ["All", "Active", "Inactive"];
 
-  const categoryOptions = useMemo(
-    () => ["All", ...new Set(products.map((p) => p.category).filter(Boolean))],
-    [products]
-  );
-  const statusOptions = useMemo(
-    () => ["All", ...new Set(products.map((p) => p.status))],
-    [products]
-  );
-
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.trim().toLowerCase());
-      const matchesCategory = categoryFilter === "All" || p.category === categoryFilter;
-      const matchesStatus = statusFilter === "All" || p.status === statusFilter;
-      return matchesSearch && matchesCategory && matchesStatus;
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+      const matchesSearch = fullName.includes(searchTerm.trim().toLowerCase());
+      const matchesRole = roleFilter === "All" || u.role === roleFilter;
+      const matchesStatus = statusFilter === "All" || u.status === statusFilter;
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [products, searchTerm, categoryFilter, statusFilter]);
+  }, [users, searchTerm, roleFilter, statusFilter]);
 
-  const activeFilterCount = (categoryFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
-  const clearFilters = () => { setCategoryFilter("All"); setStatusFilter("All"); };
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const activeFilterCount = (roleFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
+  const clearFilters = () => { setRoleFilter("All"); setStatusFilter("All"); };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -100,6 +90,13 @@ export default function ManagerInventoryList() {
     { name: "Users", icon: "👥", path: "/users" },
     { name: "Reports", icon: "📄", path: "/reports" }
   ];
+
+  const handleConfirmDelete = () => {
+    const updated = users.filter((u) => u.id !== userToDelete.id);
+    saveUsers(updated);
+    setUsers(updated);
+    setUserToDelete(null);
+  };
 
   return (
     <div className="min-h-screen flex bg-[#ede9fe]/30 font-sans relative overflow-hidden">
@@ -135,7 +132,7 @@ export default function ManagerInventoryList() {
               key={idx}
               onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
               className={`flex items-center gap-4 text-[#2e1065] font-medium py-2.5 px-4 rounded-xl text-left w-full transition-all duration-150 ${
-                item.name === "Inventory List" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
+                item.name === "Users" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
               }`}
             >
               <span className="text-lg shrink-0">{item.icon}</span>
@@ -168,12 +165,12 @@ export default function ManagerInventoryList() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full pb-12 flex-1 flex flex-col">
 
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">Inventory List</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">User Management</h1>
             <button
-              onClick={() => navigate("/manager-inventory-add-product")}
+              onClick={() => navigate("/add-user")}
               className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium gap-1 px-3.5 rounded-lg shadow-sm text-xs"
             >
-              ✦ Add New Product
+              ✦ Add New User
             </button>
           </div>
 
@@ -215,13 +212,13 @@ export default function ManagerInventoryList() {
               {isFilterOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-[#d8b4fe]/60 rounded-xl shadow-lg p-4 z-40">
                   <div className="mb-3">
-                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Category</label>
+                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">Role</label>
                     <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      value={roleFilter}
+                      onChange={(e) => setRoleFilter(e.target.value)}
                       className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
                     >
-                      {categoryOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                      {roleOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
 
@@ -257,59 +254,54 @@ export default function ManagerInventoryList() {
               <table className="table table-md w-full text-left">
                 <thead>
                   <tr className="text-[#2e1065] text-sm font-bold border-b border-[#d8b4fe]/50 bg-[#ede9fe]/30">
-                    <th className="py-4 pl-6">Product</th>
-                    <th className="py-4">Category</th>
-                    <th className="py-4">Stock</th>
+                    <th className="py-4 pl-6">Full name</th>
+                    <th className="py-4">Role</th>
                     <th className="py-4">Status</th>
-                    <th className="py-4 text-center">Receive/Dispatch</th>
-                    <th className="py-4 text-center pr-6">Edit/View</th>
+                    <th className="py-4 text-center">Edit/View</th>
+                    <th className="py-4 text-center pr-6">Delete</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm font-medium text-[#2e1065]">
-                  {filteredProducts.length > 0 ? (
-                    filteredProducts.map((p) => (
-                      <tr key={p.id} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/20 transition-colors">
-                        <td className="py-4 pl-6 text-[#2e1065]">{p.name}</td>
-                        <td className="py-4 text-[#4c1d95]/80">{p.category}</td>
-                        <td className="py-4 text-[#4c1d95]/90">{p.stock}</td>
+                  {paginatedUsers.length > 0 ? (
+                    paginatedUsers.map((u) => (
+                      <tr key={u.id} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/20 transition-colors">
+                        <td className="py-4 pl-6 text-[#2e1065]">{u.firstName} {u.lastName}</td>
+                        <td className="py-4 text-[#4c1d95]/80">{u.role}</td>
                         <td className="py-4">
-                          <span className={`font-semibold ${
-                            p.status === 'In stock' ? 'text-emerald-600' :
-                            p.status === 'Low Stock' ? 'text-amber-500' : 'text-rose-500'
-                          }`}>
-                            {p.status}
+                          <span className={`font-semibold ${u.status === 'Active' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                            {u.status}
                           </span>
                         </td>
                         <td className="py-4 text-center">
-                          <button
-                            onClick={() => setChoiceProduct(p)}
-                            className="btn btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-[#2e1065] font-semibold px-4 rounded-md"
-                          >
-                            Receive/Dispatch
-                          </button>
-                        </td>
-                        <td className="py-4 text-center pr-6">
-                         <div className="flex justify-center gap-2">
+                          <div className="flex justify-center gap-2">
                             <button
-                              onClick={() => navigate(`/edit-product/${p.id}`)}
+                              onClick={() => navigate(`/edit-user/${u.id}`)}
                               className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased"
                             >
                               🖋︎
                             </button>
                             <button
-                              onClick={() => navigate(`/product-details/${p.id}`)}
+                              onClick={() => navigate(`/view-user/${u.id}`)}
                               className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased"
                             >
                               👁︎
                             </button>
                           </div>
                         </td>
+                        <td className="py-4 text-center pr-6">
+                          <button
+                            onClick={() => setUserToDelete(u)}
+                            className="btn btn-square btn-xs bg-rose-500 hover:bg-rose-600 border-0 text-sm flex items-center justify-center text-white antialiased mx-auto"
+                          >
+                            🗑
+                          </button>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-[#2e1065]/60 text-sm font-medium">
-                        No products match your search or filters.
+                      <td colSpan={5} className="py-8 text-center text-[#2e1065]/60 text-sm font-medium">
+                        No users match your search or filters.
                       </td>
                     </tr>
                   )}
@@ -318,46 +310,61 @@ export default function ManagerInventoryList() {
             </div>
 
             <div className="flex justify-end gap-1.5 mt-5">
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">‹</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd] border-0 text-xs text-[#2e1065] font-bold">1</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">2</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">3</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">›</button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065] disabled:opacity-40"
+              >
+                ‹
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`btn btn-square btn-xs border-0 text-xs font-bold ${
+                    currentPage === pageNum ? 'bg-[#c4b5fd] text-[#2e1065]' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 text-[#2e1065]'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065] disabled:opacity-40"
+              >
+                ›
+              </button>
             </div>
           </div>
         </main>
       </div>
 
-      {/* Receive/Dispatch CHOICE modal */}
-      {choiceProduct && (
+      {/* Delete Confirmation Modal */}
+      {userToDelete && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-            <h2 className="text-lg font-bold text-[#2e1065] mb-1">Receive or Dispatch?</h2>
-            <p className="text-xs text-[#2e1065]/60 mb-6">
-              What would you like to do with <span className="font-semibold">{choiceProduct.name}</span>?
+            <div className="text-rose-600 text-4xl mb-3">⚠</div>
+            <h2 className="text-lg font-bold text-[#2e1065] mb-1">Delete this user?</h2>
+            <p className="text-sm font-semibold text-[#2e1065] mb-1">
+              {userToDelete.firstName} {userToDelete.lastName}
             </p>
+            <p className="text-xs text-[#2e1065]/60 mb-6">This action cannot be undone.</p>
 
-            <div className="flex flex-col gap-3 mb-3">
+            <div className="flex gap-3">
               <button
-                onClick={() => navigate(`/receive-product/${choiceProduct.id}`)}
-                className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium rounded-lg py-2"
+                onClick={() => setUserToDelete(null)}
+                className="btn btn-sm flex-1 bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium rounded-lg"
               >
-                Receive Product
+                Cancel
               </button>
               <button
-                onClick={() => navigate(`/dispatch-product/${choiceProduct.id}`)}
-                className="btn btn-sm bg-[#5B4FBF] hover:bg-[#4c3fb0] border-0 text-white font-medium rounded-lg py-2"
+                onClick={handleConfirmDelete}
+                className="btn btn-sm flex-1 bg-rose-600 hover:bg-rose-700 border-0 text-white font-medium rounded-lg"
               >
-                Dispatch Product
+                Delete
               </button>
             </div>
-
-            <button
-              onClick={() => setChoiceProduct(null)}
-              className="btn btn-sm w-full bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium rounded-lg"
-            >
-              Cancel
-            </button>
           </div>
         </div>
       )}
