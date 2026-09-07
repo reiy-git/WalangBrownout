@@ -16,7 +16,10 @@ import ManagerEditSafetyStock from './pages/ManagerEditSafetyStock';
 import ManagerReports from './pages/ManagerReports';
 import ManagerViewReport from './pages/ManagerViewReport';
 import ManagerSearchReport from './pages/ManagerSearchReport';
-
+import ManagerUserManagement from './pages/ManagerUserManagement';
+import ManagerAddUser from './pages/ManagerAddUser';
+import ManagerEditUser from './pages/ManagerEditUser';
+import ManagerViewUser from './pages/ManagerViewUser';
 
 export default function App() {
   return (
@@ -37,6 +40,10 @@ export default function App() {
       <Route path="/reports" element={<ManagerReports />} />
       <Route path="/view-report" element={<ManagerViewReport />} />
       <Route path="/search-report" element={<ManagerSearchReport />} />
+      <Route path="/users" element={<ManagerUserManagement />} />
+      <Route path="/add-user" element={<ManagerAddUser />} />
+      <Route path="/edit-user/:id" element={<ManagerEditUser />} />
+      <Route path="/view-user/:id" element={<ManagerViewUser />} />
     </Routes>
   );
 }
