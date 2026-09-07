@@ -1,203 +1,42 @@
-import { useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import LoginPage from "./LoginPage";
-import DashboardLayout from "./DashboardLayout";
-import StaffDashboard from "./StaffDashboard";
-import InventoryList from "./InventoryList";
-import AddProduct from "./Addproduct";
-import ViewProduct from "./Viewproduct";
-import ReceiveProduct from "./ReceiveProduct";
-import DispatchProduct from "./DispatchProduct";
-import StaffViewProfile from "./StaffViewProfile";
-import StaffSettings from "./StaffSettings";
-import ProtectedRoute from "./ProtectedRoute";
+import React from 'react';
+import { Routes, Route } from 'react-router'; 
+import LoginRoleSelection from './pages/LoginRoleSelection';
+import LoginPage from './pages/LoginPage';
+import StaffLogin from './pages/StaffLogin';
+import ManagerDashboard from './pages/ManagerDashboard';
+import ManagerInventoryList from './pages/ManagerInventoryList'; 
+import ManagerInventoryAddProduct from './pages/ManagerInventoryAddProduct';
+import ManagerProductDetails from './pages/ManagerProductDetails';
+import ManagerEditProduct from './pages/ManagerEditProduct';
+import ManagerReceiveProduct from './pages/ManagerReceiveProduct';
+import ManagerDispatchProduct from './pages/ManagerDispatchProduct';
+import ManagerReorderManagement from './pages/ManagerReorderManagement';
+import ManagerReorderDetail from './pages/ManagerReorderDetail';
+import ManagerEditSafetyStock from './pages/ManagerEditSafetyStock';
+import ManagerReports from './pages/ManagerReports';
+import ManagerViewReport from './pages/ManagerViewReport';
+import ManagerSearchReport from './pages/ManagerSearchReport';
 
-const initialProducts = [
-  {
-    name: "Aircon Split Type 1.5HP",
-    category: "Appliances",
-    stock: 24,
-    status: "In Stock",
-    photo: "https://metroplazadavao.com/cdn/shop/products/KolinKSM-SW15-5G1M_300x.jpg?v=1589725569",
-  },
-  {
-    name: "Canon PIXMA G3010",
-    category: "Electronics",
-    stock: 8,
-    status: "Low Stock",
-    photo: "https://ansons.ph/wp-content/uploads/2023/06/02_PIXMA-G3010_01.png",
-  },
-  {
-    name: "Office Chair Ergonomic",
-    category: "Furniture",
-    stock: 0,
-    status: "Out Of Stock",
-    photo: "https://flexispot.ph/wp-content/uploads/2021/05/C7x800x800.webp",
-  },
-];
 
-const getStatus = (stock) => {
-  if (stock <= 0) return "Out Of Stock";
-  if (stock <= 10) return "Low Stock";
-  return "In Stock";
-};
-
-// Routes now live in their own component, rendered under <BrowserRouter>,
-// so useNavigate() can be used here (it can't be used in App itself).
-function AppRoutes({
-  user,
-  setUser,
-  avatarUrl,
-  setAvatarUrl,
-  productList,
-  handleLogin,
-  handleLogout,
-  addProduct,
-  updateProduct,
-  applyStockChange,
-}) {
-  const navigate = useNavigate();
-
+export default function App() {
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={user ? <Navigate to="/" replace /> : <LoginPage onLogin={handleLogin} />}
-      />
-
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute user={user}>
-            <DashboardLayout
-              staffName={user?.username}
-              avatarUrl={avatarUrl}
-              onLogout={handleLogout}
-            />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<StaffDashboard />} />
-
-        <Route path="inventory" element={<InventoryList items={productList} />} />
-        <Route
-          path="inventory/add"
-          element={
-            <AddProduct
-              categories={[...new Set(productList.map((p) => p.category))]}
-              onSubmit={addProduct}
-            />
-          }
-        />
-        <Route
-          path="inventory/view/:name"
-          element={<ViewProduct products={productList} onUpdate={updateProduct} />}
-        />
-        <Route
-          path="inventory/receive/:name"
-          element={
-            <ReceiveProduct
-              products={productList}
-              onApply={(name, qty) => applyStockChange(name, "Receive", qty)}
-            />
-          }
-        />
-        <Route
-          path="inventory/dispatch/:name"
-          element={
-            <DispatchProduct
-              products={productList}
-              onApply={(name, qty) => applyStockChange(name, "Dispatch", qty)}
-            />
-          }
-        />
-
-        <Route
-          path="profile"
-          element={<StaffViewProfile username={user?.username} avatarUrl={avatarUrl} onAvatarChange={setAvatarUrl} />}
-        />
-        <Route
-          path="settings"
-          element={
-            <StaffSettings
-              username={user?.username}
-              onSave={({ username: newUsername }) => {
-                if (newUsername) setUser((u) => ({ ...u, username: newUsername }));
-                navigate("/");
-              }}
-              onCancel={() => navigate("/")}
-            />
-          }
-        />
-      </Route>
-
-      <Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />
+      <Route path="/" element={<LoginRoleSelection />} />
+      <Route path="/login" element={<StaffLogin />} />
+      <Route path="/manager-login" element={<LoginPage />} />
+      <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+      <Route path="/inventory-list" element={<ManagerInventoryList />} />
+      <Route path="/manager-inventory-add-product" element={<ManagerInventoryAddProduct />} />
+      <Route path="/product-details/:id" element={<ManagerProductDetails />} />
+      <Route path="/edit-product/:id" element={<ManagerEditProduct />} />
+      <Route path="/receive-product/:id" element={<ManagerReceiveProduct />} />
+      <Route path="/dispatch-product/:id" element={<ManagerDispatchProduct />} />
+      <Route path="/reorder-points" element={<ManagerReorderManagement />} />
+      <Route path="/reorder-points/:id" element={<ManagerReorderDetail />} />
+      <Route path="/reorder-points/:id/edit-safety-stock" element={<ManagerEditSafetyStock />} />
+      <Route path="/reports" element={<ManagerReports />} />
+      <Route path="/view-report" element={<ManagerViewReport />} />
+      <Route path="/search-report" element={<ManagerSearchReport />} />
     </Routes>
   );
 }
-
-function App() {
-  const [user, setUser] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [productList, setProductList] = useState(initialProducts);
-
-  const handleLogin = ({ username, password }) => {
-    console.log(username, password);
-    setUser({ username });
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setAvatarUrl("");
-  };
-
-  const addProduct = (formData) => {
-    const stockNum = Number(formData.stock) || 0;
-    const newProduct = {
-      name: formData.name,
-      category: formData.category,
-      stock: stockNum,
-      status: getStatus(stockNum),
-      ...(formData.price ? { price: formData.price } : {}),
-      ...(formData.photo ? { photo: URL.createObjectURL(formData.photo) } : {}),
-    };
-    setProductList((prev) => [...prev, newProduct]);
-  };
-
-  const updateProduct = (productName, updates) => {
-    setProductList((prev) =>
-      prev.map((p) => (p.name === productName ? { ...p, ...updates } : p))
-    );
-  };
-
-  const applyStockChange = (productName, mode, quantity) => {
-    const qty = Number(quantity);
-    if (!qty || qty <= 0) return;
-    setProductList((prev) =>
-      prev.map((p) => {
-        if (p.name !== productName) return p;
-        const newStock = mode === "Receive" ? p.stock + qty : Math.max(0, p.stock - qty);
-        return { ...p, stock: newStock, status: getStatus(newStock) };
-      })
-    );
-  };
-
-  return (
-    <BrowserRouter>
-      <AppRoutes
-        user={user}
-        setUser={setUser}
-        avatarUrl={avatarUrl}
-        setAvatarUrl={setAvatarUrl}
-        productList={productList}
-        handleLogin={handleLogin}
-        handleLogout={handleLogout}
-        addProduct={addProduct}
-        updateProduct={updateProduct}
-        applyStockChange={applyStockChange}
-      />
-    </BrowserRouter>
-  );
-}
-
-export default App;
