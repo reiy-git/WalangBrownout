@@ -1,12 +1,23 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router';
 
-export default function ManagerInventoryAddProduct() {
+const STORAGE_KEY = "ims_products";
+
+function loadProducts() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+function saveProducts(products) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+}
+
+export default function ManagerEditProduct() {
   const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { id } = useParams();
   const fileInputRef = useRef(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Form state
+  const [loaded, setLoaded] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
@@ -17,41 +28,61 @@ export default function ManagerInventoryAddProduct() {
 
   const categoryOptions = ["Appliances", "Accessories", "Electronics", "Furniture"];
 
+  useEffect(() => {
+    const products = loadProducts();
+    const product = products.find((p) => String(p.id) === String(id));
+    if (product) {
+      setImagePreview(product.image || null);
+      setProductName(product.name || "");
+      setCategory(product.category || "");
+      setStockQuantity(String(product.stock ?? ""));
+      setReorderPoint(String(product.reorderPoint ?? ""));
+      setPrice(String(product.price ?? ""));
+      setDescription(product.description || "");
+    }
+    setLoaded(true);
+  }, [id]);
+
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImagePreview(URL.createObjectURL(file));
+    if (file) setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleLogout = () => navigate("/");
+  const handleCancel = () => navigate("/inventory-list");
+
+  const handleUpdate = () => {
+    if (!productName.trim()) {
+      alert("Please enter a product name.");
+      return;
     }
-  };
-
-  const handleLogout = () => {
-    navigate("/");
-  };
-
-  const handleCancel = () => {
+    const products = loadProducts();
+    const updated = products.map((p) =>
+      String(p.id) === String(id)
+        ? {
+            ...p,
+            name: productName,
+            category,
+            stock: Number(stockQuantity) || 0,
+            reorderPoint: Number(reorderPoint) || 0,
+            price,
+            description,
+            image: imagePreview,
+          }
+        : p
+    );
+    saveProducts(updated);
     navigate("/inventory-list");
   };
 
-  const handleSave = () => {
-  if (!productName.trim()) {
-    alert("Please enter a product name.");
-    return;
-  }
-  const raw = localStorage.getItem("ims_products");
-  const products = raw ? JSON.parse(raw) : [];
-  const newProduct = {
-    id: Date.now().toString(),
-    name: productName,
-    category,
-    stock: Number(stockQuantity) || 0,
-    reorderPoint: Number(reorderPoint) || 0,
-    price,
-    description,
-    image: imagePreview,
+  const handleDelete = () => {
+    const confirmed = window.confirm(`Delete "${productName}"? This cannot be undone.`);
+    if (!confirmed) return;
+    const products = loadProducts();
+    const updated = products.filter((p) => String(p.id) !== String(id));
+    saveProducts(updated);
+    navigate("/inventory-list");
   };
-  localStorage.setItem("ims_products", JSON.stringify([...products, newProduct]));
-  navigate("/inventory-list");
-};
 
   const menuItems = [
     { name: "Dashboard", icon: "🏠", path: "/manager-dashboard" },
@@ -61,6 +92,8 @@ export default function ManagerInventoryAddProduct() {
     { name: "Reports", icon: "📄", path: "/reports" }
   ];
 
+  if (!loaded) return null;
+
   return (
     <div className="min-h-screen flex bg-[#ede9fe]/30 font-sans relative overflow-hidden">
 
@@ -69,7 +102,7 @@ export default function ManagerInventoryAddProduct() {
         <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 transition-opacity duration-300" />
       )}
 
-      {/* SIDEBAR MENU */}
+      {/* SIDEBAR MENU — hidden off-screen until hamburger is clicked */}
       <aside className={`fixed top-0 bottom-0 left-0 bg-[#8b7fd6] border-r border-[#ddd6fe] w-64 p-4 z-30 shadow-2xl flex flex-col transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between mb-8 px-1">
           <div className="flex items-center gap-3">
@@ -107,10 +140,8 @@ export default function ManagerInventoryAddProduct() {
         </nav>
       </aside>
 
-      {/* MAIN APPLICATION WORKSPACE AREA */}
       <div className="flex-1 flex flex-col min-w-0 w-full">
 
-        {/* Top Navbar */}
         <div className="navbar bg-[#e9d5ff] border-b border-[#ddd6fe] px-4 sm:px-6 shadow-xs flex justify-between items-center relative z-10">
           <div className="flex items-center gap-3">
             <button onClick={() => setIsSidebarOpen(true)} className="btn btn-ghost btn-square text-[#2e1065] hover:bg-[#c4b5fd]/30">
@@ -118,7 +149,7 @@ export default function ManagerInventoryAddProduct() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
               </svg>
             </button>
-            <span className="text-sm font-semibold text-[#2e1065]">Add New Product</span>
+            <span className="text-sm font-semibold text-[#2e1065]">Edit Product</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -132,16 +163,13 @@ export default function ManagerInventoryAddProduct() {
           </div>
         </div>
 
-        {/* WORKSPACE WRAPPER */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full pb-12 flex-1 flex flex-col">
 
           <div className="bg-[#ede9fe]/40 border border-[#ddd6fe]/70 rounded-2xl p-5 sm:p-6 shadow-xs flex-1">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-              {/* LEFT COLUMN */}
+              {/* LEFT COLUMN: image, Price, Reorder Point, Delete */}
               <div className="flex flex-col gap-5">
-
-                {/* Upload Image Box */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   className="bg-[#f4f2fb] border border-[#d8b4fe]/60 rounded-xl h-52 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-[#efeaf8] transition-colors overflow-hidden"
@@ -161,16 +189,45 @@ export default function ManagerInventoryAddProduct() {
                       <span className="text-xs text-[#2e1065]/60">PNG, JPG up to 2MB</span>
                     </>
                   )}
+                  <input ref={fileInputRef} type="file" accept="image/png, image/jpeg" onChange={handleImageChange} className="hidden" />
+                </div>
+
+                <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3">
+                  <label className="block text-sm font-bold text-[#2e1065] mb-2">Price</label>
                   <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png, image/jpeg"
-                    onChange={handleImageChange}
-                    className="hidden"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="Enter Price"
+                    className="input input-sm w-full bg-white border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] placeholder-[#2e1065]/40 focus:outline-none focus:border-[#8b7fd6]"
                   />
                 </div>
 
-                {/* Product Name */}
+                <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3">
+                  <label className="block text-sm font-bold text-[#2e1065] mb-2">Reorder Point</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={reorderPoint}
+                    onChange={(e) => setReorderPoint(e.target.value)}
+                    placeholder="Enter Reorder Point"
+                    className="input input-sm w-full bg-white border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] placeholder-[#2e1065]/40 focus:outline-none focus:border-[#8b7fd6]"
+                  />
+                </div>
+
+                {/* Functional Delete button */}
+                <button
+                  onClick={handleDelete}
+                  className="btn btn-sm bg-rose-600 hover:bg-rose-700 border-0 text-white font-medium rounded-lg mt-1"
+                >
+                  🗑 Delete Product
+                </button>
+              </div>
+
+              {/* RIGHT COLUMN: Product Name, Category, Stock Quantity, Description */}
+              <div className="flex flex-col gap-5">
                 <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3">
                   <label className="block text-sm font-bold text-[#2e1065] mb-2">Product Name</label>
                   <input
@@ -182,7 +239,6 @@ export default function ManagerInventoryAddProduct() {
                   />
                 </div>
 
-                {/* Category */}
                 <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3">
                   <label className="block text-sm font-bold text-[#2e1065] mb-2">Category</label>
                   <select
@@ -191,13 +247,10 @@ export default function ManagerInventoryAddProduct() {
                     className="select select-sm w-full bg-white border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
                   >
                     <option value="" disabled>Select Category</option>
-                    {categoryOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
+                    {categoryOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
 
-                {/* Stock Quantity */}
                 <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3">
                   <label className="block text-sm font-bold text-[#2e1065] mb-2">Stock Quantity</label>
                   <input
@@ -210,92 +263,31 @@ export default function ManagerInventoryAddProduct() {
                   />
                 </div>
 
-                {/* Reorder Point */}
-                <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3">
-                  <label className="block text-sm font-bold text-[#2e1065] mb-2">Reorder Point</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={reorderPoint}
-                    onChange={(e) => setReorderPoint(e.target.value)}
-                    placeholder="Enter Reorder Point"
-                    className="input input-sm w-full bg-white border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] placeholder-[#2e1065]/40 focus:outline-none focus:border-[#8b7fd6]"
+                <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3 flex-1 flex flex-col">
+                  <label className="block text-sm font-bold text-[#2e1065] mb-2">Description</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter description"
+                    rows={5}
+                    className="textarea textarea-sm w-full bg-white border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] placeholder-[#2e1065]/40 focus:outline-none focus:border-[#8b7fd6] resize-y flex-1"
                   />
                 </div>
-              </div>
 
-              {/* DIVIDER (desktop only) */}
-              <div className="hidden lg:block relative">
-                <div className="absolute left-[-16px] top-0 bottom-0 w-px bg-[#d8b4fe]/60"></div>
-
-                {/* RIGHT COLUMN */}
-                <div className="flex flex-col gap-5 pl-2">
-
-                  {/* Price */}
-                  <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3">
-                    <label className="block text-sm font-bold text-[#2e1065] mb-2">Price</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="Enter Price"
-                      className="input input-sm w-full bg-white border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] placeholder-[#2e1065]/40 focus:outline-none focus:border-[#8b7fd6]"
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div className="bg-[#c4b5fd]/40 border border-[#8b7fd6]/40 rounded-xl p-3 flex-1 flex flex-col">
-                    <label className="block text-sm font-bold text-[#2e1065] mb-2">Description</label>
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Enter description"
-                      rows={6}
-                      className="textarea textarea-sm w-full bg-white border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] placeholder-[#2e1065]/40 focus:outline-none focus:border-[#8b7fd6] resize-y flex-1"
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-end gap-3 mt-2">
-                    <button
-                      onClick={handleCancel}
-                      className="btn btn-sm bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium px-6 rounded-lg"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSave}
-                      className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 border-0 text-white font-medium px-6 rounded-lg"
-                    >
-                      Save Product
-                    </button>
-                  </div>
+                <div className="flex justify-end gap-3 mt-2">
+                  <button onClick={handleCancel} className="btn btn-sm bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium px-6 rounded-lg">
+                    Cancel
+                  </button>
+                  <button onClick={handleUpdate} className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 border-0 text-white font-medium px-6 rounded-lg">
+                    Update
+                  </button>
                 </div>
-              </div>
-
-              {/* Mobile-only buttons */}
-              <div className="flex lg:hidden justify-end gap-3 mt-2">
-                <button
-                  onClick={handleCancel}
-                  className="btn btn-sm bg-white hover:bg-gray-50 border border-gray-300 text-[#2e1065] font-medium px-6 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 border-0 text-white font-medium px-6 rounded-lg"
-                >
-                  Save Product
-                </button>
               </div>
 
             </div>
           </div>
         </main>
       </div>
-
     </div>
   );
 }

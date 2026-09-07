@@ -1,28 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 
+const STORAGE_KEY = "ims_products";
+
+function loadProducts() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+function computeStatus(stock, reorderPoint) {
+  const s = Number(stock) || 0;
+  const r = Number(reorderPoint) || 0;
+  if (s <= 0) return "Out Of Stock";
+  if (s <= r) return "Low Stock";
+  return "In stock";
+}
+
 export default function ManagerProductDetails() {
   const navigate = useNavigate();
-  const { name } = useParams();
+  const { id } = useParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [product, setProduct] = useState(null);
 
-  const baseProducts = [
-    { name: "Air Condition", category: "Appliances", stock: 67, status: "In stock" },
-    { name: "Air Purifiers", category: "Appliances", stock: 50, status: "In stock" },
-    { name: "Air Filters", category: "Accessories", stock: 30, status: "In stock" },
-    { name: "Air Condition Split Type", category: "Appliances", stock: 12, status: "Low Stock" },
-    { name: "Air Condition (Premium)", category: "Appliances", stock: 0, status: "Out Of Stock" }
-  ];
-
   useEffect(() => {
-    const customProducts = JSON.parse(localStorage.getItem("customProducts") || "[]");
-    const allProducts = [...baseProducts, ...customProducts];
-    const decodedName = decodeURIComponent(name);
-    const found = allProducts.find((p) => p.name === decodedName);
-    setProduct(found || null);
-  }, [name]);
+    const products = loadProducts();
+    const found = products.find((p) => String(p.id) === String(id));
+    if (found) {
+      setProduct({ ...found, status: computeStatus(found.stock, found.reorderPoint) });
+    } else {
+      setProduct(null);
+    }
+  }, [id]);
 
+  
   const handleLogout = () => navigate("/");
 
   const menuItems = [
