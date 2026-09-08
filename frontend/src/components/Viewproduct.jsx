@@ -27,17 +27,21 @@ export default function ViewProduct({ products = [], onClose, onUpdate }) {
   const [isDirty, setIsDirty] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Refresh the preview whenever the selected product route changes.
   useEffect(() => {
     setPhotoPreview(product.photo || null);
     setIsDirty(false);
   }, [product.photo, name]);
 
+  // Return to the inventory list unless a custom close handler was passed.
   const handleClose = onClose || (() => navigate("/inventory"));
 
+  // Trigger the hidden file picker for a new product image.
   const handleEditPhoto = () => {
     fileInputRef.current?.click();
   };
 
+  // Store the uploaded image in preview mode before saving it.
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;

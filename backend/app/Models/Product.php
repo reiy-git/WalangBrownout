@@ -11,19 +11,6 @@ class Product extends Model
     use HasFactory;
 
     protected $fillable = [
-<<<<<<< HEAD
-        'name',
-        'sku',
-        'abc_category',
-        'reorder_point',
-        'safety_stock',
-        'unit_cost',
-    ];
-
-    /**
-     * Get the product batches for the product.
-     */
-=======
         'sku',
         'name',
         'unit_cost',
@@ -44,21 +31,13 @@ class Product extends Model
         ];
     }
 
->>>>>>> 3b86ef5c652b696a11b341c3222f577945737d2b
     public function batches(): HasMany
     {
         return $this->hasMany(ProductBatch::class);
     }
-<<<<<<< HEAD
 
-    /**
-     * Get the active product batches for the product.
-     */
     public function activeBatches(): HasMany
     {
         return $this->hasMany(ProductBatch::class)->where('status', 'active');
     }
 }
-=======
-}
->>>>>>> 3b86ef5c652b696a11b341c3222f577945737d2b

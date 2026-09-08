@@ -8,9 +8,7 @@ use Illuminate\Http\Request;
 
 class ProductBatchController extends Controller
 {
-    /**
-     * Display a listing of product batches.
-     */
+    // List all inventory batches
     public function index(): JsonResponse
     {
         $batches = ProductBatch::with('product')->get();
@@ -18,9 +16,7 @@ class ProductBatchController extends Controller
         return response()->json($batches);
     }
 
-    /**
-     * Store a newly created product batch.
-     */
+    // Add a new batch of products
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -43,9 +39,7 @@ class ProductBatchController extends Controller
         ], 201);
     }
 
-    /**
-     * Display the specified product batch.
-     */
+    // Show details of one specific batch
     public function show(ProductBatch $productBatch): JsonResponse
     {
         $productBatch->load('product');
@@ -53,9 +47,7 @@ class ProductBatchController extends Controller
         return response()->json($productBatch);
     }
 
-    /**
-     * Update the specified product batch.
-     */
+    // Fix or update batch info
     public function update(Request $request, ProductBatch $productBatch): JsonResponse
     {
         $validated = $request->validate([
@@ -78,9 +70,7 @@ class ProductBatchController extends Controller
         ]);
     }
 
-    /**
-     * Remove the specified product batch.
-     */
+    // Remove a batch record
     public function destroy(ProductBatch $productBatch): JsonResponse
     {
         $productBatch->delete();

@@ -10,8 +10,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+// Manager dashboard KPI calculations and activity feeds
 class DashboardController extends Controller
 {
+    // Compute total inventory valuations and warning counters
     public function summary(Request $request): JsonResponse
     {
         $totalProducts = Product::count();
@@ -40,6 +42,7 @@ class DashboardController extends Controller
         ]);
     }
 
+    // Get recent inventory ledger stream
     public function panel1(Request $request): JsonResponse
     {
         $limit = (int) $request->query('limit', 10);
@@ -64,6 +67,7 @@ class DashboardController extends Controller
         return response()->json(['panel1' => $panel1]);
     }
 
+    // Get low stock warnings and FIFO batch alerts
     public function panel2(Request $request): JsonResponse
     {
         $reorderAlerts = $this->lowStockProducts()->get()->map(function (Product $product) {
@@ -102,6 +106,8 @@ class DashboardController extends Controller
         ]);
     }
 
+    // Filter products whose current stock is at or below ROP
+    // ROP: Trigger alert based on Reorder Point formula (Blueprint §6.1, §9.2)
     private function lowStockProducts()
     {
         return Product::select('products.*')
@@ -114,3 +120,4 @@ class DashboardController extends Controller
             );
     }
 }
+

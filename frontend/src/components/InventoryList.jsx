@@ -19,8 +19,10 @@ export default function InventoryList({ items = [] }) {
   const [statusFilter, setStatusFilter] = useState("");
   const totalPages = 3;
 
+  // Build the available category list from the current inventory data.
   const categoryOptions = [...new Set(items.map((p) => p.category))];
 
+  // Filter the table to match the search text and active dropdown values.
   const filteredItems = items.filter((item) => {
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || item.name.toLowerCase().startsWith(query);
@@ -29,6 +31,7 @@ export default function InventoryList({ items = [] }) {
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
+  // Reset all active filters back to the default view.
   const clearFilters = () => {
     setCategoryFilter("");
     setStatusFilter("");

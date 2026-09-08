@@ -13,6 +13,7 @@ export default function AddProduct({ categories = DEFAULT_CATEGORIES, onCancel =
   const [errors, setErrors] = useState({});
   const fileInputRef = useRef(null);
 
+  // Read the selected file and preview it before saving the product.
   const handleFile = (file) => {
     if (!file || !file.type.startsWith("image/")) return;
     setPhotoFile(file);
@@ -21,16 +22,19 @@ export default function AddProduct({ categories = DEFAULT_CATEGORIES, onCancel =
     reader.readAsDataURL(file);
   };
 
+  // Allow drag-and-drop uploads to reuse the same image preview logic.
   const handleDrop = (e) => {
     e.preventDefault();
     handleFile(e.dataTransfer.files?.[0]);
   };
 
+  // Keep the form values and field errors in sync while typing.
   const handleChange = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
     setErrors((err) => ({ ...err, [field]: undefined }));
   };
 
+  // Switch between a standard category and a custom category input.
   const handleCategorySelect = (e) => {
     const value = e.target.value;
     if (value === "__other__") {

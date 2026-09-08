@@ -10,7 +10,12 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
-            $table->string('status')->default('pending');
+            $table->foreignId('user_id')->constrained()->onDelete('restrict');
+            $table->timestamp('order_date')->default(now());
+            $table->enum('status', ['pending', 'completed', 'cancelled'])->default('pending');
+            $table->integer('total_items')->default(0);
+            $table->decimal('total_amount', 12, 2)->default(0);
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
