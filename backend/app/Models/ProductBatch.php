@@ -35,3 +35,4 @@ class ProductBatch extends Model
         return $this->belongsTo(Product::class);
     }
 }
+

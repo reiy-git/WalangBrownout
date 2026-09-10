@@ -35,4 +35,9 @@ class Product extends Model
     {
         return $this->hasMany(ProductBatch::class);
     }
+
+    public function activeBatches(): HasMany
+    {
+        return $this->hasMany(ProductBatch::class)->where('status', 'active');
+    }
 }

@@ -12,20 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('product_batches', function (Blueprint $table) {
-            $table->increments('id');
-            $table->unsignedInteger('product_id');
+            $table->id();
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->string('batch_number', 100);
             $table->date('date_received');
             $table->integer('quantity_received');
             $table->integer('quantity_remaining');
             $table->date('expiry_date');
-            $table->enum('status', ['active', 'depleted', 'expired']);
+            $table->enum('status', ['active', 'depleted', 'expired'])->default('active');
             $table->timestamps();
-
-            $table->foreign('product_id')
-                ->references('id')
-                ->on('products')
-                ->onDelete('cascade');
         });
     }
 
