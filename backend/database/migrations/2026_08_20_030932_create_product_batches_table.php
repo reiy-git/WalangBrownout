@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+    // Create product batches table for FIFO tracking
     public function up(): void
     {
         Schema::create('product_batches', function (Blueprint $table) {
@@ -24,9 +22,7 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
+    // Drop product batches table
     public function down(): void
     {
         Schema::dropIfExists('product_batches');

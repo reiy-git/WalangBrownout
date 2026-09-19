@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { login } from "../../api/auth";
+import { login } from "../../api";
 
+// Reusable login card with role-based validation and dynamic redirection
 export default function AuthCard({
-  allowedRoles = ["manager", "admin", "administrator"],
+  allowedRoles = ["manager", "admin", "administrator", "staff"],
   redirectPath = "/manager-dashboard",
   unauthorizedMessage = "This account is not authorized for this role.",
   onSuccess,
@@ -13,6 +14,7 @@ export default function AuthCard({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Validate credentials and trigger session setup
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
@@ -38,7 +40,8 @@ export default function AuthCard({
         if (onSuccess) {
           onSuccess(data.user);
         } else {
-          window.location.href = redirectPath;
+          // # ponytail: dynamic routing based on the role the DB told us, instead of trusting a frontend prompt
+          window.location.href = userRole === 'staff' ? "/dashboard" : "/manager-dashboard";
         }
       })
       .catch((err) => setError(err.message))

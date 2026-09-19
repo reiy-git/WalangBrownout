@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    // Create append-only inventory ledger table for transaction audit logs
     public function up(): void
     {
         Schema::create('inventory_ledgers', function (Blueprint $table) {
@@ -20,6 +21,7 @@ return new class extends Migration
         });
     }
 
+    // Drop inventory ledger table
     public function down(): void
     {
         Schema::dropIfExists('inventory_ledgers');

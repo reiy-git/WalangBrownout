@@ -20,6 +20,7 @@ class ProductBatch extends Model
         'status',
     ];
 
+    // Define model attribute data type casts
     protected function casts(): array
     {
         return [
@@ -30,6 +31,7 @@ class ProductBatch extends Model
         ];
     }
 
+    // Relationship to parent product record
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);

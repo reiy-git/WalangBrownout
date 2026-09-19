@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { getDashboardData } from "../api/imsApi";
-import { getTransactionsList } from "../services/dataService";
-import { DUMMY_DASHBOARD_SUMMARY, USE_DUMMY_DATA } from "../data/dummyData";
+import { getDashboardData, getTransactionsList } from "../api";
+import { formatCurrency, formatDateTime, formatNumber } from "../utils/format";
 
 const SUMMARY_FALLBACKS = [
   "Total Products",
@@ -12,18 +11,14 @@ const SUMMARY_FALLBACKS = [
 ];
 
 export default function ManagerDashboard() {
-  const [dashboard, setDashboard] = useState(
-    USE_DUMMY_DATA ? DUMMY_DASHBOARD_SUMMARY : null,
-  );
+  const [dashboard, setDashboard] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
     getDashboardData()
       .then(setDashboard)
-      .catch((dashboardError) => {
-        if (!USE_DUMMY_DATA) setError(dashboardError.message);
-      });
+      .catch((err) => setError(err.message));
   }, []);
 
   useEffect(() => {
@@ -51,10 +46,16 @@ export default function ManagerDashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-8">
         {Array.from({ length: 5 }, (_, index) => {
           const item = summary[`summary_item_${index + 1}`] || {};
+          const label = item.label || SUMMARY_FALLBACKS[index];
+          const rawVal = item.value ?? 0;
+          const displayVal = typeof label === "string" && label.toLowerCase().includes("value")
+            ? formatCurrency(rawVal)
+            : formatNumber(rawVal);
+
           return (
             <div key={index} className="bg-[#ede9fe] border border-[#ddd6fe]/70 shadow-xs rounded-xl p-4 flex flex-col items-center justify-center text-center">
-              <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">{item.label || SUMMARY_FALLBACKS[index]}</span>
-              <div className="text-2xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1">{item.value ?? 0}</div>
+              <span className="text-[11px] font-semibold text-[#4c1d95] tracking-wide mb-1">{label}</span>
+              <div className="text-xl font-bold text-[#2e1065] bg-[#d8b4fe]/80 w-full py-1 rounded-lg mt-1 px-1 truncate">{displayVal}</div>
             </div>
           );
         })}
@@ -69,7 +70,7 @@ export default function ManagerDashboard() {
               <tbody className="text-xs text-[#4c1d95]">
                 {transactions.slice(0, 10).map((transaction, index) => {
                   const type = transaction.type === "Received" ? "Receive" : "Dispatch";
-                  return <tr key={transaction.id || index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30"><td>{transaction.date || transaction.timestamp || "-"}</td><td className={type === "Receive" ? "text-emerald-600" : "text-rose-500"}>{type}</td><td>{transaction.productName || "Unknown Product"}</td><td>{transaction.quantity ?? 0}</td></tr>;
+                  return <tr key={transaction.id || index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30"><td>{formatDateTime(transaction.timestamp || transaction.date)}</td><td className={type === "Receive" ? "text-emerald-600" : "text-rose-500"}>{type}</td><td>{transaction.productName || "Unknown Product"}</td><td>{formatNumber(transaction.quantity)}</td></tr>;
                 })}
                 {!transactions.length && <tr><td colSpan={4} className="py-8 text-center text-[#2e1065]/60">No transactions yet.</td></tr>}
               </tbody>

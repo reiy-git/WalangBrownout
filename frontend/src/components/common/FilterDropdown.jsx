@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 
+// Reusable filter popover component supporting multiple criteria
 export default function FilterDropdown({
   filters = [], // array of { label: string, value: string, options: string[], onChange: (val) => void }
   onClear,
@@ -7,11 +8,13 @@ export default function FilterDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Compute number of non-default filter choices
   const activeCount = filters.reduce(
     (acc, f) => (f.value && f.value !== "All" ? acc + 1 : acc),
     0
   );
 
+  // Close dropdown on outside clicks
   useEffect(() => {
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {

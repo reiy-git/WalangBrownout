@@ -8,9 +8,15 @@ export default defineConfig({
     tailwindcss()
   ],
   server: {
+    host: '0.0.0.0',
+    port: 3000,
+    strictPort: true,
+    watch: {
+      usePolling: true,
+    },
     proxy: {
       '/api': {
-        target: 'http://nginx',
+        target: 'http://nginx:80',
         changeOrigin: true,
       },
     },

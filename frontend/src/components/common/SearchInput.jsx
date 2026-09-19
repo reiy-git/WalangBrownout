@@ -1,5 +1,6 @@
 import React from "react";
 
+// Reusable search input with quick clear action
 export default function SearchInput({
   value,
   onChange,

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Menu, LogOut, Home, ClipboardList, ShoppingCart, Users, FileText } from "lucide-react";
 import Sidebar from "./Sidebar";
-import { logout } from "../api/auth";
+import { logout } from "../api";
 
 // Centralized navigation configuration for the sidebar
 const MANAGER_MENU_ITEMS = [
@@ -20,7 +20,7 @@ const STAFF_MENU_ITEMS = [
 
 // Layout wrapper for both Manager and Staff dashboards
 export default function DashboardLayout({ staffName = "Admin", avatarUrl = "", onLogout }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -80,7 +80,7 @@ export default function DashboardLayout({ staffName = "Admin", avatarUrl = "", o
         onNavigate={handleSidebarNavigate}
       />
 
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen overflow-y-auto">
         {/* Top navbar */}
         <div className="navbar bg-[#e9d5ff] border-b border-[#ddd6fe] px-4 sm:px-6 shadow-xs flex justify-between items-center relative z-10">
           <div className="flex items-center gap-3">

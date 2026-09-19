@@ -25,6 +25,7 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    // Define model attribute data type casts
     protected function casts(): array
     {
         return [

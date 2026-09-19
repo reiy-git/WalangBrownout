@@ -6,15 +6,15 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+    // Create products catalog table with ABC categorization and ROP parameters
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->string('sku', 50)->unique();
             $table->string('name', 255);
+            $table->string('category', 100)->default('Appliances');
+            $table->text('image')->nullable();
             $table->decimal('unit_cost', 10, 2)->default(0);
             $table->enum('abc_category', ['A', 'B', 'C'])->default('B');
             $table->integer('expiry_months')->default(0);
@@ -26,9 +26,7 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
+    // Drop products table
     public function down(): void
     {
         Schema::dropIfExists('products');

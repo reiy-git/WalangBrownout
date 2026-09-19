@@ -1,6 +1,8 @@
 import React from "react";
 
+// Collapsible navigation sidebar supporting items and active route indicator
 export default function Sidebar({ items = [], activeKey = "dashboard", onNavigate, open = true }) {
+  // Delegate route selection to navigation handler
   const handleNavigate = (key) => {
     if (onNavigate) onNavigate(key);
   };

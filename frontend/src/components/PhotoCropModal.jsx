@@ -22,6 +22,7 @@ export default function PhotoCropModal({ src, onCancel, onSave }) {
   const displayWidth = naturalSize ? naturalSize.width * scale : 0;
   const displayHeight = naturalSize ? naturalSize.height * scale : 0;
 
+  // Keep image boundaries constrained within crop viewport
   function clampOffset(next, width = displayWidth, height = displayHeight) {
     const minX = Math.min(0, FRAME_SIZE - width);
     const minY = Math.min(0, FRAME_SIZE - height);
@@ -31,6 +32,7 @@ export default function PhotoCropModal({ src, onCancel, onSave }) {
     };
   }
 
+  // Initialize scale and center image once loaded
   const handleImageLoad = () => {
     const img = imgRef.current;
     if (!img) return;
@@ -44,6 +46,7 @@ export default function PhotoCropModal({ src, onCancel, onSave }) {
     setZoom(1);
   };
 
+  // Adjust crop zoom and clamp boundaries
   const handleZoomChange = (e) => {
     const nextZoom = Number(e.target.value);
     setZoom(nextZoom);
@@ -54,10 +57,12 @@ export default function PhotoCropModal({ src, onCancel, onSave }) {
     );
   };
 
+  // Begin drag operation to reposition image
   const startDrag = (clientX, clientY) => {
     dragRef.current = { startX: clientX, startY: clientY, startOffset: offset };
   };
 
+  // Calculate new coordinates during drag
   const moveDrag = (clientX, clientY) => {
     if (!dragRef.current) return;
     const { startX, startY, startOffset } = dragRef.current;
@@ -65,6 +70,7 @@ export default function PhotoCropModal({ src, onCancel, onSave }) {
     setOffset(clampOffset(next));
   };
 
+  // Terminate drag operation
   const endDrag = () => {
     dragRef.current = null;
   };
@@ -90,6 +96,7 @@ export default function PhotoCropModal({ src, onCancel, onSave }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset, displayWidth, displayHeight]);
 
+  // Export cropped circle region to Canvas data URL
   const handleSave = () => {
     if (!naturalSize) return;
     const canvas = document.createElement("canvas");

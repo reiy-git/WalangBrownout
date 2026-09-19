@@ -18,23 +18,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
-    // User management
-    Route::apiResource('users', UserController::class);
-
-    // Dashboard metrics & alerts
+    // Dashboard metrics
     Route::prefix('v1/dashboard')->group(function () {
         Route::get('/summary', [DashboardController::class, 'summary']);
         Route::get('/panel1', [DashboardController::class, 'panel1']);
         Route::get('/panel2', [DashboardController::class, 'panel2']);
     });
 
-    // Product & Batch management
-    Route::apiResource('products', ProductController::class);
-    Route::apiResource('product-batches', ProductBatchController::class);
-
-    // Stock movements & transaction ledger
-    Route::get('/transactions', [InventoryLedgerController::class, 'index']);
+    // Warehouse operations are available to authenticated managers and staff.
     Route::post('/transactions/receive', [InventoryLedgerController::class, 'receive']);
     Route::post('/transactions/dispatch', [InventoryLedgerController::class, 'dispatch']);
+
+    // Admin/Manager routes
+    Route::middleware('manager')->group(function () {
+        Route::apiResource('users', UserController::class);
+        Route::apiResource('product-batches', ProductBatchController::class)->except(['store']);
+        Route::apiResource('products', ProductController::class)->except(['index', 'show']);
+    });
+
+    // Public/Staff routes (view only + transactions)
+    Route::apiResource('products', ProductController::class)->only(['index', 'show']);
+    Route::get('/transactions', [InventoryLedgerController::class, 'index']);
 });
 

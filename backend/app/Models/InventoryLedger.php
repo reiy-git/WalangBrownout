@@ -18,6 +18,7 @@ class InventoryLedger extends Model
         'timestamp',
     ];
 
+    // Define model attribute data type casts
     protected function casts(): array
     {
         return [
@@ -26,16 +27,19 @@ class InventoryLedger extends Model
         ];
     }
 
+    // Relationship to affected product
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
     }
 
+    // Relationship to specific product batch involved
     public function batch(): BelongsTo
     {
         return $this->belongsTo(ProductBatch::class, 'product_batch_id');
     }
 
+    // Relationship to user who authorized movement
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    // Add role and active status columns to users table
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
@@ -14,6 +15,7 @@ return new class extends Migration
         });
     }
 
+    // Remove role and active columns from users table
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {

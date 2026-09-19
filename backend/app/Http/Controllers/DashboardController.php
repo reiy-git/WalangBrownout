@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\InventoryLedger;
-use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductBatch;
 use Illuminate\Http\JsonResponse;
@@ -24,8 +23,6 @@ class DashboardController extends Controller
             ->whereBetween('expiry_date', [now(), now()->addDays(7)])
             ->count();
 
-        $pendingOrders = Order::where('status', 'pending')->count();
-
         $totalInventoryValue = ProductBatch::join('products', 'products.id', '=',
             'product_batches.product_id')
             ->where('product_batches.status', 'active')
@@ -36,8 +33,7 @@ class DashboardController extends Controller
             'summary_item_2' => ['label' => 'Low Stock Alerts', 'value' => $lowStockCount],
             'summary_item_3' => ['label' => 'Expiring Soon (Category C)', 'value' =>
                 $expiringSoonCount],
-            'summary_item_4' => ['label' => 'Pending Orders', 'value' => $pendingOrders],
-            'summary_item_5' => ['label' => 'Total Inventory Value', 'value' => round((float)
+            'summary_item_4' => ['label' => 'Total Inventory Value', 'value' => round((float)
                 $totalInventoryValue, 2)],
         ]);
     }

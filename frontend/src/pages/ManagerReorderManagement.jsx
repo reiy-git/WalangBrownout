@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getProductsList } from "../services/dataService";
+import { getProductsList, saveProduct } from "../api";
+import { formatDate, formatNumber } from "../utils/format";
 import SearchInput from "../components/common/SearchInput";
 import FilterDropdown from "../components/common/FilterDropdown";
+import { TableSkeleton } from "../components/common/Skeleton";
 
 const PAGE_SIZE = 5;
 
+// Classify reorder urgency bucket
 function getRopStatus(stock, rop) {
   const s = Number(stock) || 0;
   const r = Number(rop) || 1;
@@ -14,23 +17,46 @@ function getRopStatus(stock, rop) {
   return "High";
 }
 
+// Manager Reorder Management page displaying ROP calculations and stock status
 export default function ManagerReorderManagement() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [rawProducts, setRawProducts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [saveError, setSaveError] = useState("");
 
+  // Load products from API on mount
   useEffect(() => {
-    getProductsList().then(setRawProducts);
+    let active = true;
+    setLoading(true);
+    getProductsList().then((items) => { if (active) setRawProducts(items); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   const products = useMemo(
     () =>
-      rawProducts.map((p) => ({
-        ...p,
-        ropStatus: getRopStatus(p.stock, p.reorderPoint),
-      })),
+      rawProducts.map((p) => {
+        const stock = p.stock !== undefined
+          ? Number(p.stock)
+          : Array.isArray(p.batches)
+            ? p.batches.reduce((acc, b) => acc + (Number(b.quantity_remaining) || 0), 0)
+            : 0;
+        const reorderPoint = Number(p.reorderPoint ?? p.reorder_point ?? 0);
+        const safetyStock = Number(p.safetyStock ?? p.safety_stock ?? 0);
+        const lastReorderDate = p.lastReorderDate || p.last_reorder_date || "-";
+
+        return {
+          ...p,
+          stock,
+          reorderPoint,
+          safetyStock,
+          lastReorderDate,
+          ropStatus: getRopStatus(stock, reorderPoint),
+        };
+      }),
     [rawProducts],
   );
 
@@ -40,7 +66,7 @@ export default function ManagerReorderManagement() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      const matchesSearch = p.name
+      const matchesSearch = (p.name || "")
         .toLowerCase()
         .includes(searchTerm.trim().toLowerCase());
       const matchesStatus =
@@ -48,6 +74,20 @@ export default function ManagerReorderManagement() {
       return matchesSearch && matchesStatus;
     });
   }, [products, searchTerm, statusFilter]);
+
+  const saveSafetyStock = async (event) => {
+    event.preventDefault();
+    const value = Number(new FormData(event.currentTarget).get("safety_stock"));
+    if (!Number.isFinite(value) || value < 0) { setSaveError("Safety stock must be zero or greater."); return; }
+    try {
+      setSaveError("");
+      await saveProduct({ ...editingProduct, safety_stock: value });
+      setEditingProduct(null);
+      setLoading(true);
+      setRawProducts(await getProductsList());
+    } catch (err) { setSaveError(err.message || "Unable to update the reorder point."); }
+    finally { setLoading(false); }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -62,6 +102,7 @@ export default function ManagerReorderManagement() {
     currentPage * PAGE_SIZE,
   );
 
+  // Return badge color according to ROP alert level
   const statusBadgeClass = (status) =>
     status === "Low"
       ? "bg-rose-500 text-white"
@@ -77,10 +118,10 @@ export default function ManagerReorderManagement() {
         </h1>
         <button
           type="button"
-          onClick={() => navigate("/manager-inventory-add-product")}
+          onClick={() => navigate("/inventory-list")}
           className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium gap-1 px-3.5 rounded-lg shadow-sm text-xs"
         >
-          ✦ Add New Product
+          ✦ View Inventory
         </button>
       </div>
 
@@ -123,7 +164,7 @@ export default function ManagerReorderManagement() {
             <p className="text-[11px] font-bold text-[#2e1065]/70 uppercase tracking-wide">
               Low
             </p>
-            <p className="text-lg font-bold text-[#2e1065]">{lowCount} items</p>
+            <p className="text-lg font-bold text-[#2e1065]">{formatNumber(lowCount)} items</p>
           </div>
         </button>
 
@@ -145,7 +186,7 @@ export default function ManagerReorderManagement() {
               Medium
             </p>
             <p className="text-lg font-bold text-[#2e1065]">
-              {mediumCount} items
+              {formatNumber(mediumCount)} items
             </p>
           </div>
         </button>
@@ -168,7 +209,7 @@ export default function ManagerReorderManagement() {
               High
             </p>
             <p className="text-lg font-bold text-[#2e1065]">
-              {highCount} items
+              {formatNumber(highCount)} items
             </p>
           </div>
         </button>
@@ -176,7 +217,7 @@ export default function ManagerReorderManagement() {
 
       {/* Table Card */}
       <div className="bg-[#ede9fe]/40 border border-[#ddd6fe]/70 rounded-2xl p-4 sm:p-5 shadow-xs flex-1 flex flex-col justify-between">
-        <div className="overflow-x-auto bg-[#ffffff] rounded-xl shadow-xs border border-[#d8b4fe]/50">
+        {loading ? <TableSkeleton columns={6} rows={5} /> : <div className="overflow-x-auto bg-[#ffffff] rounded-xl shadow-xs border border-[#d8b4fe]/50">
           <table className="table table-md w-full text-left">
             <thead>
               <tr className="text-[#2e1065] text-sm font-bold border-b border-[#d8b4fe]/50 bg-[#ede9fe]/30">
@@ -185,7 +226,7 @@ export default function ManagerReorderManagement() {
                 <th className="py-4">Current Stock</th>
                 <th className="py-4">ROP Level</th>
                 <th className="py-4">Status</th>
-                <th className="py-4 text-center pr-6">View</th>
+                <th className="py-4 text-center pr-6">Action</th>
               </tr>
             </thead>
             <tbody className="text-sm font-medium text-[#2e1065]">
@@ -214,10 +255,10 @@ export default function ManagerReorderManagement() {
                       </div>
                     </td>
                     <td className="py-4 text-[#4c1d95]/80">
-                      {p.lastReorderDate}
+                      {formatDate(p.lastReorderDate)}
                     </td>
-                    <td className="py-4 text-[#4c1d95]/90">{p.stock}</td>
-                    <td className="py-4 text-[#4c1d95]/90">{p.reorderPoint}</td>
+                    <td className="py-4 text-[#4c1d95]/90">{formatNumber(p.stock)}</td>
+                    <td className="py-4 text-[#4c1d95]/90">{formatNumber(p.reorderPoint)}</td>
                     <td className="py-4">
                       <span
                         className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusBadgeClass(p.ropStatus)}`}
@@ -227,10 +268,10 @@ export default function ManagerReorderManagement() {
                     </td>
                     <td className="py-4 text-center pr-6">
                       <button
-                        onClick={() => navigate(`/reorder-points/${p.id}`)}
-                        className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased mx-auto"
+                        onClick={() => { setSaveError(""); setEditingProduct(p); }}
+                        className="btn btn-xs bg-white border border-[#2e1065]/20 text-[#2e1065] hover:bg-[#ede9fe]"
                       >
-                        👁︎
+                        Edit ROP
                       </button>
                     </td>
                   </tr>
@@ -247,10 +288,9 @@ export default function ManagerReorderManagement() {
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
 
-        {/* Functional Pagination */}
-        <div className="flex justify-end gap-1.5 mt-5">
+        {!loading && <div className="flex justify-end gap-1.5 mt-5">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
@@ -280,8 +320,9 @@ export default function ManagerReorderManagement() {
           >
             ›
           </button>
-        </div>
+        </div>}
       </div>
+      {editingProduct && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true"><form onSubmit={saveSafetyStock} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-lg font-bold text-[#2e1065]">Edit Reorder Point</h2><p className="mt-1 text-sm text-[#4c1d95]">{editingProduct.name}</p><div className="mt-4 grid grid-cols-2 gap-3 text-sm"><p>Current stock: <b>{formatNumber(editingProduct.stock)}</b></p><p>Current ROP: <b>{formatNumber(editingProduct.reorderPoint)}</b></p></div><label className="form-control mt-4"><span className="label-text text-xs">Safety stock</span><input name="safety_stock" className="input input-bordered input-sm" type="number" min="0" defaultValue={editingProduct.safetyStock} required /></label><p className="mt-2 min-h-5 text-xs text-rose-600">{saveError}</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setEditingProduct(null)} className="btn btn-sm btn-ghost">Cancel</button><button type="submit" className="btn btn-sm border-0 bg-[#8b7fd6] text-white">Save ROP</button></div></form></div>}
     </main>
   );
 }
