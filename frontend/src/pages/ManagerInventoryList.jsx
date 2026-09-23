@@ -1,338 +1,233 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { computeStatus, getProductsList, saveProduct, recordReceiveStock, recordDispatchStock } from "../api";
+import { formatCurrency, formatDate, formatNumber } from "../utils/format";
+import FilterDropdown from "../components/common/FilterDropdown";
+import SearchInput from "../components/common/SearchInput";
+import { TableSkeleton } from "../components/common/Skeleton";
 
-export default function InventoryList() {
-  const navigate = useNavigate();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  // Search input tracking state
+export default function ManagerInventoryList() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Filter dropdown open/close state
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const filterRef = useRef(null);
-
-  // Active filter values
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [modal, setModal] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const isManager = ["manager", "admin", "administrator"].includes(
+    (localStorage.getItem("user_role") || "").toLowerCase(),
+  );
 
-  // Products array matching your exact screen items
-  const [customProducts, setCustomProducts] = useState([]);
-
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("customProducts") || "[]");
-    setCustomProducts(saved);
+  const refreshProducts = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      setProducts(await getProductsList());
+    } catch (err) {
+      setError(err.message || "Unable to load inventory.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const baseProducts = [
-    { name: "Air Condition", category: "Appliances", stock: 67, status: "In stock" },
-    { name: "Air Purifiers", category: "Appliances", stock: 50, status: "In stock" },
-    { name: "Air Filters", category: "Accessories", stock: 30, status: "In stock" },
-    { name: "Air Condition Split Type", category: "Appliances", stock: 12, status: "Low Stock" },
-    { name: "Air Condition (Premium)", category: "Appliances", stock: 0, status: "Out Of Stock" }
-  ];
+  useEffect(() => {
+    refreshProducts();
+  }, [refreshProducts]);
 
-  const products = [...baseProducts, ...customProducts];
+  const normalizedProducts = useMemo(
+    () =>
+      products.map((product) => {
+        const stock = product.stock !== undefined
+          ? Number(product.stock)
+          : Array.isArray(product.batches)
+            ? product.batches.reduce((acc, b) => acc + (Number(b.quantity_remaining) || 0), 0)
+            : 0;
+        const reorderPoint = Number(product.reorderPoint ?? product.reorder_point ?? 0);
+        const category = product.category || (product.abc_category ? `Category ${product.abc_category}` : "Unassigned");
+        const status = computeStatus(stock, reorderPoint);
 
-  // Derive unique category/status options straight from the data
+        return {
+          ...product,
+          stock,
+          reorderPoint,
+          category,
+          status,
+        };
+      }),
+    [products],
+  );
+
   const categoryOptions = useMemo(
-    () => ["All", ...new Set(products.map((p) => p.category))],
-    [products]
+    () => ["All", ...new Set(normalizedProducts.map((product) => product.category).filter(Boolean))],
+    [normalizedProducts],
   );
+
   const statusOptions = useMemo(
-    () => ["All", ...new Set(products.map((p) => p.status))],
-    [products]
+    () => ["All", ...new Set(normalizedProducts.map((product) => product.status))],
+    [normalizedProducts],
   );
 
-  // Combined search + filter logic
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchesSearch = p.name
-        .toLowerCase()
-        .includes(searchTerm.trim().toLowerCase());
-      const matchesCategory =
-        categoryFilter === "All" || p.category === categoryFilter;
-      const matchesStatus =
-        statusFilter === "All" || p.status === statusFilter;
-
+    const query = searchTerm.trim().toLowerCase();
+    return normalizedProducts.filter((product) => {
+      const matchesSearch = !query
+        || product.name.toLowerCase().includes(query)
+        || product.sku.toLowerCase().includes(query);
+      const matchesCategory = categoryFilter === "All" || product.category === categoryFilter;
+      const matchesStatus = statusFilter === "All" || product.status === statusFilter;
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [products, searchTerm, categoryFilter, statusFilter]);
+  }, [normalizedProducts, searchTerm, categoryFilter, statusFilter]);
 
-  const activeFilterCount =
-    (categoryFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
-
-  const clearFilters = () => {
-    setCategoryFilter("All");
-    setStatusFilter("All");
+  const closeModal = () => {
+    setModal(null);
+    setFormError("");
   };
 
-  // Close the filter dropdown when clicking outside of it
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) {
-        setIsFilterOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleLogout = () => {
-    navigate("/");
+  const submit = async (event, action) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setFormError("");
+    try {
+      await action(new FormData(event.currentTarget));
+      await refreshProducts();
+      closeModal();
+    } catch (err) {
+      setFormError(err.message || "Unable to save changes.");
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const menuItems = [
-    { name: "Dashboard", icon: "🏠", path: "/manager-dashboard" },
-    { name: "Inventory List", icon: "📋", path: "/inventory-list" },
-    { name: "Reorder Points", icon: "🛒", path: "/reorder-points" },
-    { name: "Users", icon: "👥", path: "/users" },
-    { name: "Reports", icon: "📄", path: "/reports" }
-  ];
 
   return (
-    <div className="min-h-screen flex bg-[#ede9fe]/30 font-sans relative overflow-hidden">
-
-      {/* BACKGROUND DIMMER */}
-      {isSidebarOpen && (
-        <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/30 z-20 transition-opacity duration-300" />
-      )}
-
-      {/* SIDEBAR MENU */}
-      <aside className={`fixed top-0 bottom-0 left-0 bg-[#8b7fd6] border-r border-[#ddd6fe] w-64 p-4 z-30 shadow-2xl flex flex-col transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between mb-8 px-1">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-sm">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://w3.org">
-                <path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" fill="url(#invBoxGrad)" stroke="#ffffff" strokeWidth="0.5" />
-                <path d="M12 2L21 7L12 12L3 7L12 2Z" fill="#ffffff" fillOpacity="0.35" />
-                <path d="M12 12V22" stroke="#ffffff" strokeWidth="0.6" strokeOpacity="0.5" />
-                <defs>
-                  <linearGradient id="invBoxGrad" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#8B7FD6" />
-                    <stop offset="1" stopColor="#5B4FBF" />
-                  </linearGradient>
-                </defs>
-              </svg>
-            </div>
-            <span className="font-bold text-xl text-[#2e1065] tracking-wide">IMS</span>
-          </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="btn btn-sm btn-ghost btn-circle text-[#2e1065]">✕</button>
-        </div>
-
-        <nav className="flex flex-col gap-4 flex-1">
-          {menuItems.map((item, idx) => (
-            <button
-              key={idx}
-              onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
-              className={`flex items-center gap-4 text-[#2e1065] font-medium py-2.5 px-4 rounded-xl text-left w-full transition-all duration-150 ${item.name === "Inventory List" ? 'bg-[#c4b5fd] shadow-xs' : 'bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/80'
-                }`}
-            >
-              <span className="text-lg shrink-0">{item.icon}</span>
-              <span className="text-sm font-semibold">{item.name}</span>
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {/* MAIN APPLICATION WORKSPACE AREA */}
-      <div className="flex-1 flex flex-col min-w-0 w-full">
-
-        {/* Top Navbar */}
-        <div className="navbar bg-[#e9d5ff] border-b border-[#ddd6fe] px-4 sm:px-6 shadow-xs flex justify-between items-center relative z-10">
-          <button onClick={() => setIsSidebarOpen(true)} className="btn btn-ghost btn-square text-[#2e1065] hover:bg-[#c4b5fd]/30">
-            <svg xmlns="http://w3.org" fill="none" viewBox="0 0 24 24" className="inline-block w-5 h-5" stroke="#6b5ba8" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full pb-12 flex-1 flex flex-col font-sans">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">Inventory List</h1>
+        {isManager && (
+          <button type="button" onClick={() => setModal({ type: "add" })} className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium gap-1 px-3.5 rounded-lg shadow-sm text-xs">
+            ✦ Add New Product
           </button>
-
-          <div className="flex items-center gap-3">
-            <div className="avatar">
-              <div className="w-8 h-8 rounded-full ring ring-[#c4b5fd] ring-offset-base-100 ring-offset-2">
-                <img src="https://daisyui.com" alt="Profile" />
-              </div>
-            </div>
-            <span className="text-xs font-semibold text-[#2e1065]">Admin</span>
-            <button onClick={handleLogout} className="btn btn-xs btn-outline border-[#c4b5fd] text-[#2e1065] hover:bg-[#ddd6fe] hover:border-[#c4b5fd] rounded-sm px-2">Logout</button>
-          </div>
-        </div>
-
-        {/* WORKSPACE WRAPPER */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full pb-12 flex-1 flex flex-col">
-
-          {/* Header Action Section */}
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">Inventory List</h1>
-            <button
-              onClick={() => navigate("/manager-inventory-add-product")}
-              className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium gap-1 px-3.5 rounded-lg shadow-sm text-xs"
-            >
-              ✦ Add New Product
-            </button>
-          </div>
-
-          {/* Controls Bar Row */}
-          <div className="flex gap-4 items-center mb-6 relative">
-            {/* Search Input Control */}
-            <div className="relative max-w-xs w-full">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search Product..."
-                className="input input-sm w-full bg-[#c4b5fd]/30 border border-[#8b7fd6]/50 rounded-lg pl-3 pr-8 text-xs font-medium text-[#2e1065] placeholder-[#2e1065]/60 focus:outline-none focus:border-[#8b7fd6]"
-              />
-              {searchTerm ? (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#2e1065]/70 hover:text-[#2e1065]"
-                  aria-label="Clear search"
-                >
-                  ✕
-                </button>
-              ) : (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#2e1065]/70 pointer-events-none">🔍</span>
-              )}
-            </div>
-
-            {/* Filter Toggle Action */}
-            <div className="relative" ref={filterRef}>
-              <button
-                onClick={() => setIsFilterOpen((prev) => !prev)}
-                className="btn btn-sm bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/60 border border-[#8b7fd6]/40 text-[#2e1065] gap-1 px-3.5 rounded-lg text-xs font-medium"
-              >
-                <span>⏳</span> Filters
-                {activeFilterCount > 0 && (
-                  <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#8b7fd6] text-white text-[10px] font-bold">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Filter Dropdown Panel */}
-              {isFilterOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-[#d8b4fe]/60 rounded-xl shadow-lg p-4 z-40">
-                  <div className="mb-3">
-                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">
-                      Category
-                    </label>
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
-                    >
-                      {categoryOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-[11px] font-bold text-[#2e1065] mb-1.5 uppercase tracking-wide">
-                      Status
-                    </label>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="select select-sm w-full bg-[#ede9fe]/50 border border-[#8b7fd6]/40 rounded-lg text-xs font-medium text-[#2e1065] focus:outline-none focus:border-[#8b7fd6]"
-                    >
-                      {statusOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <button
-                      onClick={clearFilters}
-                      className="text-[11px] font-semibold text-[#8b7fd6] hover:text-[#6b5ba8]"
-                    >
-                      Clear Filters
-                    </button>
-                    <button
-                      onClick={() => setIsFilterOpen(false)}
-                      className="btn btn-xs bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium px-4 rounded-md"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Table Container Card Component */}
-          <div className="bg-[#ede9fe]/40 border border-[#ddd6fe]/70 rounded-2xl p-4 sm:p-5 shadow-xs flex-1 flex flex-col justify-between">
-            <div className="overflow-x-auto bg-[#ffffff] rounded-xl shadow-xs border border-[#d8b4fe]/50">
-              <table className="table table-md w-full text-left">
-                <thead>
-                  <tr className="text-[#2e1065] text-sm font-bold border-b border-[#d8b4fe]/50 bg-[#ede9fe]/30">
-                    <th className="py-4 pl-6">Product</th>
-                    <th className="py-4">Category</th>
-                    <th className="py-4">Stock</th>
-                    <th className="py-4">Status</th>
-                    <th className="py-4 text-center">Receive/Dispatch</th>
-                    <th className="py-4 text-center pr-6">Edit/View</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm font-medium text-[#2e1065]">
-                  {filteredProducts.length > 0 ? (
-                    filteredProducts.map((p, index) => (
-                      <tr key={index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/20 transition-colors">
-                        <td className="py-4 pl-6 text-[#2e1065]">{p.name}</td>
-                        <td className="py-4 text-[#4c1d95]/80">{p.category}</td>
-                        <td className="py-4 text-[#4c1d95]/90">{p.stock}</td>
-                        <td className="py-4">
-                          <span className={`font-semibold ${p.status === 'In stock' ? 'text-emerald-600' :
-                              p.status === 'Low Stock' ? 'text-amber-500' : 'text-rose-500'
-                            }`}>
-                            {p.status}
-                          </span>
-                        </td>
-                        <td className="py-4 text-center">
-                          <button className="btn btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-[#2e1065] font-semibold px-4 rounded-md">
-                            Receive/Dispatch
-                          </button>
-                        </td>
-                        <td className="py-4 text-center pr-6">
-                          <div className="flex justify-center gap-2">
-                            <button className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased">
-                              🖋︎
-                            </button>
-                            <button
-                              onClick={() => navigate(`/product-details/${encodeURIComponent(p.name)}`)}
-                              className="btn btn-square btn-xs bg-[#c4b5fd] hover:bg-[#b4a5ed] border-0 text-sm flex items-center justify-center text-[#2e1065] antialiased"
-                            >
-                              👁︎
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-[#2e1065]/60 text-sm font-medium">
-                        No products match your search or filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Controls Section */}
-            <div className="flex justify-end gap-1.5 mt-5">
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">‹</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd] border-0 text-xs text-[#2e1065] font-bold">1</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">2</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">3</button>
-              <button className="btn btn-square btn-xs bg-[#c4b5fd]/40 hover:bg-[#c4b5fd]/70 border border-[#8b7fd6]/30 text-xs text-[#2e1065]">›</button>
-            </div>
-
-          </div>
-        </main>
+        )}
       </div>
 
+      <div className="flex gap-4 items-center mb-6">
+        <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Search product or SKU..." />
+        <FilterDropdown
+          filters={[
+            { label: "Category", value: categoryFilter, options: categoryOptions, onChange: setCategoryFilter },
+            { label: "Status", value: statusFilter, options: statusOptions, onChange: setStatusFilter },
+          ]}
+          onClear={() => { setCategoryFilter("All"); setStatusFilter("All"); }}
+        />
+      </div>
+
+      {error && <div className="alert alert-error mb-4 text-sm">{error}</div>}
+
+      <div className="bg-[#ede9fe]/40 border border-[#ddd6fe]/70 rounded-2xl p-4 sm:p-5 shadow-xs flex-1">
+        {loading ? <TableSkeleton columns={6} rows={6} /> : (
+          <div className="overflow-x-auto bg-white rounded-xl shadow-xs border border-[#d8b4fe]/50">
+            <table className="table table-md w-full text-left">
+              <thead><tr className="text-[#2e1065] text-sm font-bold border-b border-[#d8b4fe]/50 bg-[#ede9fe]/30"><th className="py-4 pl-6">Product</th><th className="py-4">Category</th><th className="py-4">Stock</th><th className="py-4">Status</th><th className="py-4 text-center">Receive/Dispatch</th><th className="py-4 text-center pr-6">Edit/View</th></tr></thead>
+              <tbody className="text-sm font-medium text-[#2e1065]">
+                {filteredProducts.map((product) => (
+                  <tr key={product.id} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/20 transition-colors">
+                    <td className="py-4 pl-6"><div>{product.name}</div><div className="text-xs text-[#4c1d95]/60">{product.sku}</div></td><td className="py-4">{product.category || "-"}</td><td className="py-4">{formatNumber(product.stock)}</td>
+                    <td className="py-4"><span className={product.status === "In Stock" ? "text-emerald-600" : product.status === "Low Stock" ? "text-amber-500" : "text-rose-500"}>{product.status}</span></td>
+                    <td className="py-4 text-center">
+                      <button type="button" onClick={() => setModal({ type: "receive", product })} className="btn btn-xs bg-emerald-100 text-emerald-700 mr-2 rounded-md">Receive</button>
+                      <button type="button" onClick={() => setModal({ type: "dispatch", product })} className="btn btn-xs bg-rose-100 text-rose-700 rounded-md">Dispatch</button>
+                    </td>
+                    <td className="py-4 text-center pr-6">
+                      <button type="button" onClick={() => setModal({ type: "details", product })} className="btn btn-xs bg-white border border-gray-300 text-[#2e1065]">View Details</button>
+                    </td>
+                  </tr>
+                ))}
+                {!filteredProducts.length && <tr><td colSpan={6} className="py-8 text-center text-[#2e1065]/60">No products found.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {modal?.type === "details" && (
+        <InventoryModal title="Product Details & FIFO Batches" onClose={closeModal}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5 text-sm">
+            <div><p className="text-xs text-gray-500">Stock</p><b>{formatNumber(modal.product.stock)}</b></div>
+            <div><p className="text-xs text-gray-500">Unit Cost</p><b>{formatCurrency(modal.product.unit_cost)}</b></div>
+            <div><p className="text-xs text-gray-500">Reorder Point</p><b>{formatNumber(modal.product.reorderPoint)}</b></div>
+            <div><p className="text-xs text-gray-500">Safety Stock</p><b>{formatNumber(modal.product.safety_stock)}</b></div>
+          </div>
+          <div className="overflow-x-auto"><table className="table table-sm"><thead><tr><th>Batch</th><th>Received</th><th>Expiry</th><th>Remaining</th><th>Status</th></tr></thead><tbody>
+            {(modal.product.batches || []).map((batch) => <tr key={batch.id}><td>{batch.batch_number}</td><td>{formatDate(batch.date_received)}</td><td>{formatDate(batch.expiry_date)}</td><td>{formatNumber(batch.quantity_remaining)} / {formatNumber(batch.quantity_received)}</td><td className="capitalize">{batch.status}</td></tr>)}
+            {!modal.product.batches?.length && <tr><td colSpan={5}>No batch records available.</td></tr>}
+          </tbody></table></div>
+        </InventoryModal>
+      )}
+
+      {modal?.type === "add" && (
+        <InventoryModal title="Add New Product" onClose={closeModal}>
+          <form className="grid sm:grid-cols-2 gap-4" onSubmit={(event) => submit(event, (data) => saveProduct(Object.fromEntries(data)))}>
+            <InventoryField name="name" label="Product name" required />
+            <InventoryField name="sku" label="SKU" required />
+            <InventoryField name="unit_cost" label="Unit cost" type="number" step="0.01" required />
+            <label className="form-control"><span className="label-text text-xs">ABC category</span><select name="abc_category" className="select select-bordered select-sm" defaultValue="B"><option>A</option><option>B</option><option>C</option></select></label>
+            <InventoryField name="safety_stock" label="Safety stock" type="number" defaultValue={5} required />
+            <InventoryField name="annual_demand" label="Annual demand" type="number" defaultValue={100} required />
+            <InventoryField name="expiry_months" label="Expiry months (0 for appliances)" type="number" defaultValue={0} required />
+            <ModalActions error={formError} submitting={submitting} onClose={closeModal} />
+          </form>
+        </InventoryModal>
+      )}
+
+      {modal?.type === "receive" && (
+        <InventoryModal title={`Receive Stock — ${modal.product.name}`} onClose={closeModal}>
+          <form className="grid sm:grid-cols-2 gap-4" onSubmit={(event) => submit(event, (data) => recordReceiveStock({ productId: modal.product.id, quantity: data.get("quantity"), supplier: data.get("supplier"), batchNumber: data.get("batch_number") || undefined, notes: data.get("notes") || undefined }))}>
+            <InventoryField name="quantity" label="Quantity" type="number" min="1" required />
+            <InventoryField name="supplier" label="Supplier" required />
+            <InventoryField name="batch_number" label="Batch number (optional)" />
+            <InventoryField name="notes" label="Notes (optional)" />
+            <ModalActions error={formError} submitting={submitting} onClose={closeModal} label="Receive Stock" />
+          </form>
+        </InventoryModal>
+      )}
+
+      {modal?.type === "dispatch" && (
+        <InventoryModal title={`Dispatch Stock — ${modal.product.name}`} onClose={closeModal}>
+          <form className="grid sm:grid-cols-2 gap-4" onSubmit={(event) => submit(event, (data) => {
+            const quantity = Number(data.get("quantity"));
+            if (quantity > modal.product.stock) throw new Error(`Only ${modal.product.stock} unit(s) are available.`);
+            return recordDispatchStock({ productId: modal.product.id, quantity, department: data.get("department"), notes: data.get("notes") || undefined });
+          })}>
+            <InventoryField name="quantity" label={`Quantity (available: ${modal.product.stock})`} type="number" min="1" max={modal.product.stock} required />
+            <InventoryField name="department" label="Department / destination" required />
+            <InventoryField name="notes" label="Notes (optional)" />
+            <ModalActions error={formError} submitting={submitting} onClose={closeModal} label="Dispatch Stock" />
+          </form>
+        </InventoryModal>
+      )}
+    </main>
+  );
+}
+
+function InventoryModal({ title, children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <section className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-violet-100 bg-white px-5 py-4">
+          <h2 className="text-base font-bold text-[#2e1065]">{title}</h2>
+          <button type="button" onClick={onClose} className="btn btn-ghost btn-sm btn-square" aria-label="Close modal">✕</button>
+        </header>
+        <div className="p-5">{children}</div>
+      </section>
     </div>
   );
+}
+
+function InventoryField({ label, name, type = "text", ...props }) {
+  return <label className="form-control"><span className="label-text text-xs">{label}</span><input name={name} type={type} className="input input-bordered input-sm" {...props} /></label>;
+}
+
+function ModalActions({ error, submitting, onClose, label = "Save" }) {
+  return <div className="sm:col-span-2"><p className="min-h-5 text-xs text-rose-600">{error}</p><div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="btn btn-sm btn-ghost">Cancel</button><button type="submit" disabled={submitting} className="btn btn-sm bg-[#8b7fd6] text-white border-0">{submitting ? "Saving..." : label}</button></div></div>;
 }

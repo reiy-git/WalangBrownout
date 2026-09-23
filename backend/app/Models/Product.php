@@ -22,6 +22,7 @@ class Product extends Model
         'last_reorder_date',
     ];
 
+    // Define model attribute data type casts
     protected function casts(): array
     {
         return [
@@ -31,8 +32,18 @@ class Product extends Model
         ];
     }
 
+    // Relationship to all associated batches
     public function batches(): HasMany
     {
         return $this->hasMany(ProductBatch::class);
+    }
+
+    // Relationship to non-expired batches with remaining stock
+    public function activeBatches(): HasMany
+    {
+        // # ponytail: Dynamically define active. Prevents needing a cron job to set status='expired'.
+        return $this->hasMany(ProductBatch::class)
+            ->where('quantity_remaining', '>', 0)
+            ->where('expiry_date', '>=', now()->toDateString());
     }
 }

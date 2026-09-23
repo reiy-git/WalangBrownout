@@ -6,8 +6,10 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
+// Handle user authentication and API tokens
 class AuthController extends Controller
 {
+    // Register new user and return token
     public function register(Request $request)
     {
         $request->validate([
@@ -31,6 +33,7 @@ class AuthController extends Controller
         ], 201);
     }
 
+    // Verify credentials and create login token
     public function login(Request $request)
     {
         $request->validate([
@@ -55,6 +58,7 @@ class AuthController extends Controller
         ]);
     }
 
+    // Revoke token on logout
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -64,6 +68,7 @@ class AuthController extends Controller
         ]);
     }
 
+    // Get currently authenticated user profile
     public function user(Request $request)
     {
         return response()->json([
