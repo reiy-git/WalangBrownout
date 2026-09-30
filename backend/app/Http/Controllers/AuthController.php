@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
+// Handle user authentication and API tokens
 class AuthController extends Controller
 {
      // Creates a new user account and issues an API token

@@ -7,4 +7,18 @@ export default defineConfig({
     react(),
     tailwindcss()
   ],
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
+    strictPort: true,
+    watch: {
+      usePolling: true,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://nginx:80',
+        changeOrigin: true,
+      },
+    },
+  },
 })
