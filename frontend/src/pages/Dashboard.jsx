@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { getDashboardData, getTransactionsList } from "../api";
 import { formatCurrency, formatDateTime, formatNumber } from "../utils/format";
 
@@ -8,16 +8,24 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const [transactions, setTransactions] = useState([]);
 
-  // Fetch dashboard stats from backend on mount
+  const dashboardFetched = useRef(false);
+  const transactionsFetched = useRef(false);
+
+  // Fetch dashboard stats from backend on mount (once)
   useEffect(() => {
+    if (dashboardFetched.current) return;
+    dashboardFetched.current = true;
     getDashboardData()
       .then(setDashboard)
       .catch((dashboardError) => setError(dashboardError.message));
   }, []);
 
-  // Sync transactions across tabs and storage updates
+  // Sync transactions across tabs and storage updates (initial fetch once)
   useEffect(() => {
-    getTransactionsList().then(setTransactions);
+    if (!transactionsFetched.current) {
+      transactionsFetched.current = true;
+      getTransactionsList().then(setTransactions);
+    }
 
     const handleTransactionUpdate = () => {
       getTransactionsList().then(setTransactions);
