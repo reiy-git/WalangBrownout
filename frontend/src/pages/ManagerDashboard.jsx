@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { getDashboardData, getTransactionsList } from "../api";
 import { formatCurrency, formatDateTime, formatNumber } from "../utils/format";
 
@@ -15,18 +15,29 @@ export default function ManagerDashboard() {
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState("");
 
+  const dashboardFetched = useRef(false);
+  const transactionsFetched = useRef(false);
+
+  // Fetch dashboard data once on mount
   useEffect(() => {
+    if (dashboardFetched.current) return;
+    dashboardFetched.current = true;
     getDashboardData()
       .then(setDashboard)
       .catch((err) => setError(err.message));
   }, []);
 
+  // Fetch transactions once, then listen for live updates
   useEffect(() => {
     const refreshTransactions = () => {
       getTransactionsList().then(setTransactions);
     };
 
-    refreshTransactions();
+    if (!transactionsFetched.current) {
+      transactionsFetched.current = true;
+      refreshTransactions();
+    }
+
     window.addEventListener("storage", refreshTransactions);
     window.addEventListener("ims_transactions_updated", refreshTransactions);
 
