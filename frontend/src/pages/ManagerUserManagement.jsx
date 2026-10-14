@@ -66,7 +66,7 @@ export default function ManagerUserManagement() {
   );
 
   const activeFilterCount = (roleFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
-  
+
   // Reset all active filter selections
   const clearFilters = () => { setRoleFilter("All"); setStatusFilter("All"); };
 

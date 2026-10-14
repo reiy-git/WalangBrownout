@@ -1,6 +1,6 @@
 // Main App component - defines all the routes (pages) of the application
 import React, { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom'; 
+import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -20,7 +20,7 @@ export default function App() {
       <Route path="/" element={<LoginPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/manager-login" element={<LoginPage />} />
-      
+
       <Route element={<DashboardLayout />}>
         {/* Staff & Manager Shared */}
         <Route element={<ProtectedRoute allowedRoles={['manager', 'admin', 'administrator', 'staff']} />}>

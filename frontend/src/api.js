@@ -43,7 +43,7 @@ async function request(endpoint, options = {}) {
   const text = await res.text();
   let data = {};
   if (text.trim()) {
-    try { data = JSON.parse(text); } 
+    try { data = JSON.parse(text); }
     catch { data = { message: text.replace(/<[^>]+>/g, "").trim() }; }
   }
   if (!res.ok) throw new Error(data.message || res.statusText || "Request failed");
@@ -59,7 +59,7 @@ export async function login({ email, password }) {
 
 // Revoke current authentication token and clear local session
 export async function logout() {
-  try { await request("/logout", { method: "POST" }); } 
+  try { await request("/logout", { method: "POST" }); }
   finally {
     localStorage.removeItem("auth_token");
     clearCache();
