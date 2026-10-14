@@ -1,10 +1,11 @@
-.PHONY: setup up down restart logs backend-shell frontend-shell migrate
+.PHONY: setup up down restart logs backend-shell frontend-shell migrate seed
 
 # First-time project setup
 setup:
 	docker compose up -d --build
-	docker compose exec backend php artisan key:generate
-	docker compose exec backend php artisan migrate
+	docker compose exec backend composer install --no-interaction --prefer-dist
+	docker compose exec backend sh -c 'if grep -q "^APP_KEY=$$" .env || grep -q "^APP_KEY=\"\"$$" .env; then php artisan key:generate; else echo "Preserving existing APP_KEY"; fi'
+	docker compose exec backend php artisan migrate --force
 
 # Start containers in background
 up:
@@ -33,4 +34,8 @@ frontend-shell:
 
 # Run database migrations
 migrate:
-	docker compose exec backend php artisan migrate
+	docker compose exec backend php artisan migrate --force
+
+# Load local demo accounts and inventory (never use against production)
+seed:
+	docker compose exec backend php artisan db:seed --force

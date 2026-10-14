@@ -16,7 +16,10 @@ class InventoryLedgerController extends Controller
     // List ledger transactions from the database
     public function index(Request $request): JsonResponse
     {
-        $limit = (int) $request->query('limit', 50);
+        $validated = $request->validate([
+            'limit' => 'sometimes|integer|min:1|max:100',
+        ]);
+        $limit = $validated['limit'] ?? 50;
 
         $transactions = InventoryLedger::with(['product', 'batch', 'user'])
             ->orderBy('timestamp', 'desc')
@@ -28,8 +31,16 @@ class InventoryLedgerController extends Controller
                     'productId' => $tx->product_id,
                     'productName' => $tx->product?->name ?? 'Unknown',
                     'quantity' => $tx->quantity,
-                    'type' => $tx->transaction_type === 'receive' ? 'Received' : 'Dispatched',
+                    'type' => match ($tx->transaction_type) {
+                        'receive' => 'Received',
+                        'dispatch' => 'Dispatched',
+                        'count_adjustment' => 'Count Adjusted',
+                        default => ucfirst(str_replace('_', ' ', $tx->transaction_type)),
+                    },
                     'transaction_type' => $tx->transaction_type,
+                    'notes' => $tx->notes,
+                    'quantity_before' => $tx->quantity_before,
+                    'quantity_after' => $tx->quantity_after,
                     'user' => $tx->user?->name ?? 'System',
                     'date' => $tx->timestamp?->toDateString() ?? now()->toDateString(),
                     'batchNumber' => $tx->batch?->batch_number,
@@ -53,7 +64,7 @@ class InventoryLedgerController extends Controller
 
         return DB::transaction(function () use ($validated, $request) {
             $product = Product::findOrFail($validated['product_id']);
-            $batchNumber = $validated['batch_number'] ?? ('BATCH-' . date('Ymd') . '-' . rand(100, 999));
+            $batchNumber = $validated['batch_number'] ?? ('BATCH-'.date('Ymd').'-'.rand(100, 999));
             $expiryDate = $validated['expiry_date'] ?? now()->addMonths($product->expiry_months ?: 12)->toDateString();
 
             $batch = ProductBatch::create([
@@ -95,22 +106,29 @@ class InventoryLedgerController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
-            $product = Product::findOrFail($validated['product_id']);
+            $product = Product::whereKey($validated['product_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
             $needed = $validated['quantity'];
 
-            $availableStock = (int) $product->activeBatches()->sum('quantity_remaining');
+            $batches = $product->activeBatches()
+                ->orderBy('date_received')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $availableStock = (int) $batches->sum('quantity_remaining');
             if ($availableStock < $needed) {
                 return response()->json([
                     'message' => "Insufficient stock. Available: {$availableStock}, Requested: {$needed}",
                 ], 422);
             }
 
-            // Pick oldest active batches first (FIFO)
-            $batches = $product->activeBatches()->orderBy('date_received', 'asc')->orderBy('id', 'asc')->get();
             $ledgers = [];
 
             foreach ($batches as $batch) {
-                if ($needed <= 0) break;
+                if ($needed <= 0) {
+                    break;
+                }
 
                 $take = min($batch->quantity_remaining, $needed);
                 $batch->quantity_remaining -= $take;
@@ -134,6 +152,51 @@ class InventoryLedgerController extends Controller
             return response()->json([
                 'message' => 'Stock dispatched successfully via FIFO batches.',
                 'ledgers' => $ledgers,
+            ]);
+        });
+    }
+
+    public function reconcileCount(Request $request, ProductBatch $productBatch): JsonResponse
+    {
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:0',
+            'reason' => 'required|string|min:3|max:1000',
+        ]);
+
+        return DB::transaction(function () use ($validated, $request, $productBatch) {
+            Product::whereKey($productBatch->product_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $batch = ProductBatch::whereKey($productBatch->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $quantityBefore = $batch->quantity_remaining;
+            $quantityAfter = $validated['quantity'];
+            $difference = $quantityAfter - $quantityBefore;
+
+            $batch->quantity_remaining = $quantityAfter;
+            $batch->status = $quantityAfter === 0
+                ? 'depleted'
+                : ($batch->expiry_date->lt(today()) ? 'expired' : 'active');
+            $batch->save();
+
+            $ledger = InventoryLedger::create([
+                'product_id' => $batch->product_id,
+                'product_batch_id' => $batch->id,
+                'user_id' => $request->user()->id,
+                'transaction_type' => 'count_adjustment',
+                'quantity' => $difference,
+                'notes' => $validated['reason'],
+                'quantity_before' => $quantityBefore,
+                'quantity_after' => $quantityAfter,
+                'timestamp' => now(),
+            ]);
+
+            return response()->json([
+                'message' => 'Physical stock count reconciled and recorded.',
+                'batch' => $batch,
+                'ledger' => $ledger,
             ]);
         });
     }

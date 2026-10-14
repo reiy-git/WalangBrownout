@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Services\ReorderPointService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,7 +18,7 @@ class ProductController extends Controller
     }
 
     // Save a new product to the database
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, ReorderPointService $reorderPointService): JsonResponse
     {
         $validated = $request->validate([
             'sku' => 'required|string|max:50|unique:products,sku',
@@ -28,12 +29,14 @@ class ProductController extends Controller
             'reorder_point' => 'sometimes|integer|min:0',
             'safety_stock' => 'required|integer|min:0',
             'annual_demand' => 'required|numeric|min:0',
+            'seasonal_demand_multiplier' => 'sometimes|required|numeric|min:0.1|max:5',
+            'max_stock_level' => 'nullable|integer|min:0',
             'last_reorder_date' => 'nullable|date',
         ]);
 
+        $validated['seasonal_demand_multiplier'] ??= 1.0;
         $product = new Product($validated);
-        // # ponytail: Enforce Blueprint 6.1 formula directly
-        $product->reorder_point = $this->calculateRop($product);
+        $product->reorder_point = (int) round($reorderPointService->calculate($product));
         $product->save();
 
         return response()->json([
@@ -51,10 +54,10 @@ class ProductController extends Controller
     }
 
     // Update product info
-    public function update(Request $request, Product $product): JsonResponse
+    public function update(Request $request, Product $product, ReorderPointService $reorderPointService): JsonResponse
     {
         $validated = $request->validate([
-            'sku' => 'sometimes|required|string|max:50|unique:products,sku,' . $product->id,
+            'sku' => 'sometimes|required|string|max:50|unique:products,sku,'.$product->id,
             'name' => 'sometimes|required|string|max:255',
             'unit_cost' => 'sometimes|required|numeric|min:0',
             'abc_category' => 'sometimes|required|in:A,B,C',
@@ -62,11 +65,13 @@ class ProductController extends Controller
             'reorder_point' => 'sometimes|integer|min:0',
             'safety_stock' => 'sometimes|required|integer|min:0',
             'annual_demand' => 'sometimes|required|numeric|min:0',
+            'seasonal_demand_multiplier' => 'sometimes|required|numeric|min:0.1|max:5',
+            'max_stock_level' => 'nullable|integer|min:0',
             'last_reorder_date' => 'nullable|date',
         ]);
 
         $product->fill($validated);
-        $product->reorder_point = $this->calculateRop($product);
+        $product->reorder_point = (int) round($reorderPointService->calculate($product));
         $product->save();
 
         return response()->json([
@@ -83,13 +88,5 @@ class ProductController extends Controller
         return response()->json([
             'message' => 'Product deleted successfully.',
         ]);
-    }
-
-    // Calculate Reorder Point: (Average Daily Demand × Multiplier × Lead Time) + Safety Stock
-    private function calculateRop(Product $product, int $leadTimeDays = 7): int
-    {
-        $dailyDemand = (float)($product->annual_demand / 365);
-        $multiplier = ($product->abc_category === 'A') ? 1.5 : 1.0;
-        return (int) round(($dailyDemand * $multiplier * $leadTimeDays) + $product->safety_stock);
     }
 }

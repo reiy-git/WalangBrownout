@@ -1,16 +1,11 @@
 // Login role selection page - user picks Manager or Staff before signing in
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function LoginRoleSelection() {
   const navigate = useNavigate();
-  const [selectedRole, setSelectedRole] = useState(null);
-
   // Navigate to the correct login page based on the chosen role
   const handleRoleSelect = (role) => {
-    setSelectedRole(role);
-    console.log(`Selected Role: ${role}`);
-    
     if (role === 'manager') {
       navigate("/manager-login"); 
     } else {

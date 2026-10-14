@@ -1,8 +1,12 @@
 # Walang Brownout Appliances
 
-A real-time, web-based inventory management system for Walang Brownout Appliances, built with React, Laravel, and MySQL to address seasonal shortages, apply FIFO stock handling, and automate Reorder Point (ROP) alerts.
-
-> **Status: early development.** The Laravel API (authentication, products, product batches) and the Docker environment work. The React frontend is a UI prototype on mock data and is **not yet connected to the API**. FIFO, ROP alerts, stock movements, and reports are **planned, not implemented**.
+A web-based inventory management system for Walang Brownout Appliances, built
+with React, Laravel, MySQL, and Docker. The repository includes API-backed
+authentication, product and batch management, FIFO receiving/dispatch, a stock
+ledger, reorder/expiry alerts, dashboards, reports, and user-management screens.
+It also supports manager-configured seasonal demand multipliers and overstock
+thresholds, plus manager/admin physical-count reconciliation with ledger audit.
+Seasonal forecasting and automatic season scheduling are not implemented.
 
 ## Table of Contents
 
@@ -30,26 +34,24 @@ A real-time, web-based inventory management system for Walang Brownout Appliance
 
 Walang Brownout Appliances sells appliances such as air conditioners, air purifiers, and filters, whose demand rises sharply in some seasons. This system is meant to give the business one place to see what is in stock, which batch it came from, when it expires, and when to reorder.
 
-The project's stated goals are to solve **seasonal shortages**, enforce **FIFO**, and automate **Reorder Point (ROP) alerts**. The data model already has the fields these need; the logic itself is not written yet (see [Inventory Logic](#inventory-logic)).
+The project's goals are to reduce **seasonal shortages**, enforce **FIFO**, and
+provide **Reorder Point (ROP) and stock alerts**. FIFO, configurable seasonal
+factors, optional overstock limits, and auditable physical-count adjustments
+are implemented; see [Inventory Logic](#inventory-logic).
 
 ## Features and Status
 
- Implemented ·  In development / partial ·  Planned
+Implemented · In development / partial · Planned
 
 | Component | Status | Notes |
 | --- | --- | --- |
-| Docker environment |  | 4 services (MySQL, PHP-FPM, Nginx, Vite). Development only; no production config. |
-| Authentication API |  | Register, login, logout, current user (Sanctum bearer tokens). |
-| Product CRUD API |  | `/api/products` with validation; responses include batches. |
-| Product batch CRUD API |  | `/api/product-batches` with validation; responses include the product. |
-| Frontend UI |  | Role selection, 2 login screens, manager dashboard, inventory list, add product, product details. Mock data and `localStorage` only. |
-| Frontend login |  | Form checks only; no API call, token storage, or route guard. |
-| ROP / safety stock / ABC / expiry |  | Stored as fields only; no calculations or alerts. |
-| FIFO |  | Batch fields exist; no allocation logic. |
-| Stock movement (receive/dispatch) |  | No table, model, or endpoint. |
-| Reports, user management |  | Sidebar links only; no pages or endpoints. |
-| Real-time updates |  | Not implemented (`BROADCAST_CONNECTION=log` in `.env.example`). |
-| Automated tests |  | Default Laravel example tests only. |
+| Docker environment | Implemented (development) | MySQL, PHP-FPM, Nginx, Vite; no production hardening. |
+| Authentication | Implemented | Laravel Sanctum bearer tokens and role-aware React routes. |
+| Inventory API/UI | Implemented | Products, batches, receive/dispatch operations, FIFO batch allocation. |
+| Inventory controls | Implemented (configured rules) | ROP, manager-configured seasonal multipliers and optional overstock thresholds, expiry alerts, FIFO, and audited count reconciliation. |
+| Ledger and reports | Implemented (baseline) | Inventory movements are recorded and shown in dashboards/reports. |
+| Automated tests | Implemented (feature coverage) | PHPUnit covers batch eligibility, FIFO dispatch, insufficient stock, dashboard alerts, seasonal ROP, count audit/authorization, and disabled direct batch mutation routes. |
+| Collaboration evidence | Team-dependent | Reviews, commits, and tested integration must reflect actual contributions. |
 
 ## Architecture
 
@@ -68,7 +70,12 @@ flowchart TD
 | `backend` | `php:8.4-fpm` (`docker/php/DOCKERFILE`) | none (9000 internal) | Laravel API |
 | `db` | `mysql:9.7` | 3306 | Database |
 
-All services share the `app-network` bridge network. `./backend` and `./frontend` are bind-mounted for live editing. There is no MySQL data volume and no health check.
+All services share the `app-network` bridge network. `./backend` and
+`./frontend` are bind-mounted for live editing. Compose logs Laravel output to
+stderr, and a Docker-managed framework volume holds Laravel runtime files.
+MySQL readiness is checked before the backend starts. Configure a persistent
+database volume before using this development stack for any environment whose
+database contents must survive container recreation.
 
 ## Tech Stack
 
@@ -126,7 +133,8 @@ cd WalangBrownout
 cp backend/.env.example backend/.env      # PowerShell: Copy-Item backend/.env.example backend/.env
 ```
 
-`.env.example` defaults to SQLite. To use the MySQL container, set these in `backend/.env`, using the values from the `db` service in `docker-compose.yml`:
+`.env.example` is configured for the local MySQL service. Keep these values
+aligned with the `db` service in `docker-compose.yml`:
 
 ```dotenv
 DB_CONNECTION=mysql
@@ -134,7 +142,7 @@ DB_HOST=db
 DB_PORT=3306
 DB_DATABASE=app_db
 DB_USERNAME=app_user
-DB_PASSWORD=<MYSQL_PASSWORD value from docker-compose.yml>
+DB_PASSWORD=app_password
 ```
 
 `DB_HOST` must be `db` (the service name), not `127.0.0.1`.
@@ -146,13 +154,14 @@ docker compose up -d --build
 docker compose ps
 ```
 
-**3. Install backend dependencies, generate the key, and migrate** (`backend/vendor/` is git-ignored):
+**3. Install backend dependencies, generate the key once, and apply migrations**
+(`vendor/` is a Docker-managed volume; the Compose setup installs dependencies):
 
 ```bash
 docker compose exec backend composer install
-docker compose exec backend php artisan key:generate
-docker compose exec backend php artisan migrate
-docker compose exec backend php artisan db:seed     # optional: creates a test user (see DatabaseSeeder.php)
+docker compose exec backend php artisan key:generate   # first setup only; never replace a key in use
+docker compose exec backend php artisan migrate --force
+docker compose exec backend php artisan db:seed --force     # optional local demo data only
 ```
 
 The frontend installs its dependencies at image build time and starts the Vite dev server automatically.
@@ -163,22 +172,23 @@ The frontend installs its dependencies at image build time and starts the Vite d
 
 | Command | Purpose |
 | --- | --- |
-| `make setup` | `up -d --build`, then `key:generate`, then `migrate` (does **not** create `.env` or run `composer install`; do those first) |
+| `make setup` | Build/start containers, install Composer dependencies, generate `APP_KEY` only if empty, then apply pending migrations; create `backend/.env` first |
 | `make up` / `make down` | Start / stop containers |
 | `make restart` | `down`, then `up -d --build` |
 | `make logs` | Follow logs for all services |
 | `make backend-shell` / `make frontend-shell` | Open a shell in the backend (`bash`) / frontend (`sh`) container |
-| `make migrate` | Run `php artisan migrate` |
+| `make migrate` | Apply pending migrations without dropping existing data |
+| `make seed` | Load local demo users and inventory; never use in production |
 
 ## Database
 
-Migrations create these tables: `users`, `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `personal_access_tokens` (Sanctum), `products`, and `product_batches`. The application tables are below; the rest are standard Laravel framework tables.
+Migrations create these tables: `users`, `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `personal_access_tokens` (Sanctum), `products`, `product_batches`, and `inventory_ledgers`. The application tables are below; the rest are standard Laravel framework tables.
 
 **`products`** (PK `id`, unsigned int)
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `sku` | varchar(50) | Unique via API validation only (no DB index) |
+| `sku` | varchar(50) | Unique database index and API validation |
 | `name` | varchar(255) | |
 | `unit_cost` | decimal(10,2) | |
 | `abc_category` | enum `A`, `B`, `C` | |
@@ -186,6 +196,8 @@ Migrations create these tables: `users`, `password_reset_tokens`, `sessions`, `c
 | `reorder_point` | int | |
 | `safety_stock` | int | |
 | `annual_demand` | decimal(10,2) | |
+| `seasonal_demand_multiplier` | decimal(4,2) | Manager-configured factor, 0.1–5; existing Category A items retain 1.5 |
+| `max_stock_level` | unsigned int, nullable | Optional threshold for overstock alerts |
 | `last_reorder_date` | date, nullable | |
 | `created_at`, `updated_at` | timestamps | |
 
@@ -199,14 +211,30 @@ Migrations create these tables: `users`, `password_reset_tokens`, `sessions`, `c
 | `quantity_received` | int | |
 | `quantity_remaining` | int | |
 | `expiry_date` | date | |
-| `status` | enum `active`, `depleted`, `expired` | Set by the client; not derived automatically |
+| `status` | enum `active`, `depleted`, `expired` | Set by receiving, dispatch, and count reconciliation operations; batch API update/delete is disabled |
 | `created_at`, `updated_at` | timestamps | |
+
+**`inventory_ledgers`** (append-only stock movement history; product deletion is restricted, batch/user deletion sets the respective nullable reference to `NULL`)
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | unsigned bigint | Primary key |
+| `product_id` | unsigned bigint | Required product reference |
+| `product_batch_id`, `user_id` | nullable unsigned bigint | Optional batch and actor references |
+| `transaction_type` | varchar | `receive`, `dispatch`, or `count_adjustment` |
+| `quantity` | int | Received/dispatched quantity or signed count delta |
+| `timestamp` | timestamp | Indexed movement time |
+| `notes` | text, nullable | Count-adjustment reason |
+| `quantity_before`, `quantity_after` | int, nullable | Count audit values; null for ordinary movements |
 
 **`users`**: `id`, `name`, `email` (unique), `email_verified_at`, `password` (hashed), `remember_token`, timestamps.
 
 ```mermaid
 erDiagram
     PRODUCTS ||--o{ PRODUCT_BATCHES : "has many (FK product_id, cascade delete)"
+    PRODUCTS ||--o{ INVENTORY_LEDGERS : "has many (FK product_id, restrict delete)"
+    PRODUCT_BATCHES o|--o{ INVENTORY_LEDGERS : "optional batch reference"
+    USERS o|--o{ INVENTORY_LEDGERS : "optional actor reference"
     USERS ||--o{ PERSONAL_ACCESS_TOKENS : "issues (polymorphic, no DB FK)"
 ```
 
@@ -221,15 +249,17 @@ Base URL: `http://localhost/api`. Send `Accept: application/json`. Protected rou
 | POST | `/logout` | Yes | Revoke the current token |
 | GET | `/user` | Yes | Authenticated user |
 | GET | `/products` | Yes | List products with `batches` (not paginated) |
-| POST | `/products` | Yes | Create product (201) |
-| GET | `/products/{product}` | Yes | Show product with `batches` |
-| PUT/PATCH | `/products/{product}` | Yes | Update product |
-| DELETE | `/products/{product}` | Yes | Delete product (batches cascade) |
-| GET | `/product-batches` | Yes | List batches with `product` (not paginated) |
-| POST | `/product-batches` | Yes | Create batch (201) |
-| GET | `/product-batches/{product_batch}` | Yes | Show batch with `product` |
-| PUT/PATCH | `/product-batches/{product_batch}` | Yes | Update batch |
-| DELETE | `/product-batches/{product_batch}` | Yes | Delete batch |
+| POST | `/products` | Manager/Admin | Create product (201) |
+| GET | `/products/{product}` | Authenticated | Show product with `batches` |
+| PUT/PATCH | `/products/{product}` | Manager/Admin | Update product |
+| DELETE | `/products/{product}` | Manager/Admin | Delete product (batches cascade; ledger references restrict deletion) |
+| GET | `/product-batches` | Manager/Admin | List batches with `product` (not paginated) |
+| GET | `/product-batches/{product_batch}` | Manager/Admin | Show batch with `product` |
+| POST | `/product-batches/{productBatch}/count` | Manager/Admin | Reconcile counted quantity; requires reason and writes before/after audit values |
+| POST | `/transactions/receive` | Authenticated | Receive stock into a new batch and write a ledger entry |
+| POST | `/transactions/dispatch` | Authenticated | Dispatch available stock using locked FIFO batches |
+| GET | `/transactions` | Authenticated | List the latest 1–100 stock ledger movements |
+| GET | `/v1/dashboard/summary`, `/v1/dashboard/panel1`, `/v1/dashboard/panel2` | Authenticated | Dashboard metrics, reorder, expiry, and configured overstock alerts |
 
 **Validation rules**
 
@@ -237,11 +267,13 @@ Base URL: `http://localhost/api`. Send `Accept: application/json`. Protected rou
 | --- | --- |
 | `POST /register` | `name` required string; `email` required, valid, unique; `password` required, min 8 |
 | `POST /login` | `email` required, valid; `password` required |
-| `POST /products` | `sku` required, max 50, unique; `name` required, max 255; `unit_cost` numeric ≥ 0; `abc_category` in `A,B,C`; `expiry_months`, `reorder_point`, `safety_stock` integer ≥ 0; `annual_demand` numeric ≥ 0; `last_reorder_date` optional date |
-| `POST /product-batches` | `product_id` must exist; `batch_number` required, max 100; `date_received` and `expiry_date` dates; `quantity_received` and `quantity_remaining` integer ≥ 0; `status` in `active,depleted,expired` |
-| `PUT/PATCH` (both) | Same fields, each optional (`sometimes`); SKU uniqueness ignores the current record |
+| `POST /products` | `sku` required, max 50, unique; `name` required, max 255; `unit_cost` numeric ≥ 0; `abc_category` in `A,B,C`; `expiry_months`, `reorder_point`, `safety_stock` integer ≥ 0; `annual_demand` numeric ≥ 0; optional `seasonal_demand_multiplier` 0.1–5 (default 1); optional nullable `max_stock_level` integer ≥ 0 |
+| `POST /product-batches/{productBatch}/count` | Manager/Admin only; `quantity` required integer ≥ 0; `reason` required string length 3–1000; atomically updates batch and writes signed delta plus before/after values to the ledger |
+| `POST /transactions/receive` | `product_id` must exist; `supplier` required; `quantity` integer ≥ 1; optional notes, batch number, expiry date |
+| `POST /transactions/dispatch` | `product_id` must exist; `department` required; `quantity` integer ≥ 1; only active, unexpired, positive-quantity stock can be dispatched |
+| `PUT/PATCH /products/{product}` | Product fields are optional (`sometimes`); SKU uniqueness ignores the current record |
 
-The API does not check that `quantity_remaining` ≤ `quantity_received` or that `expiry_date` is after `date_received`.
+Batch quantity changes cannot be performed through batch update/delete routes; use receive, FIFO dispatch, or manager/admin count reconciliation to preserve the ledger trail.
 
 **Quick manual test** (replace placeholders; never commit real tokens):
 
@@ -262,19 +294,23 @@ The backend uses **Laravel Sanctum personal access tokens** (bearer tokens), not
 
 ## Frontend
 
-React 19 + `react-router`, styled with Tailwind 4 and FlyonUI. State is local component state; there is no global store.
+React 19 + `react-router`, styled with Tailwind 4 and FlyonUI. State is local
+component state; the API client stores the Sanctum token in `localStorage` and
+caches GET responses until relevant mutations or authentication changes invalidate
+them.
 
 | Path | Page | Notes |
 | --- | --- | --- |
-| `/` | `LoginRoleSelection` | Manager goes to `/manager-login`, other role to `/login` |
-| `/login` | `StaffLogin` | See [Known Issues](#known-issues) |
-| `/manager-login` | `LoginPage` | Navigates to the dashboard without calling the API |
-| `/manager-dashboard` | `ManagerDashboard` | Hard-coded summary cards and "Recent Transactions" |
-| `/inventory-list` | `ManagerInventoryList` | Search and category/status filters; mock plus `localStorage` products |
-| `/manager-inventory-add-product` | `ManagerInventoryAddProduct` | Name, category, stock, reorder point, price, description, image preview; saves to `localStorage` key `customProducts` |
-| `/product-details/:name` | `ManagerProductDetails` | Category, stock, reorder point, price, description |
+| `/` and `/login` | `LoginPage` | Calls the Laravel login API and routes by returned role. |
+| `/dashboard` | `Dashboard` | Staff dashboard backed by summary and transaction endpoints. |
+| `/manager-dashboard` | `ManagerDashboard` | Manager dashboard backed by summary and transaction endpoints. |
+| `/inventory-list` | `ManagerInventoryList` | Product listing, search/filter, stock receipt/dispatch. |
+| `/reorder-points` | `ManagerReorderManagement` | Manager reorder controls. |
+| `/reports` | `ManagerReports` | Transaction-based reports. |
+| `/users` | `ManagerUserManagement` | Manager user controls. |
 
-`src/api/auth.js` exports `login()` (uses `VITE_API_BASE_URL` or `/api`) but no page imports it. `Dashboard.jsx`, `InventoryList.jsx`, and `StaffDashboard.jsx` exist but are not routed. The sidebar links to `/reorder-points`, `/users`, and `/reports`, which have no pages.
+Protected routes use role checks in the frontend; API authorization remains the
+security boundary and should be independently tested.
 
 ## Inventory Logic
 
@@ -282,17 +318,20 @@ What the code actually does today:
 
 | Concept | Status | Reality |
 | --- | --- | --- |
-| FIFO |  Planned | No logic. `date_received` and `quantity_remaining` are the data it would use. |
-| Reorder Point |  Data only | `reorder_point` and `last_reorder_date` are stored. No backend calculation or alert. The add-product form labels stock client-side: above the reorder point is "In stock", above zero is "Low Stock", otherwise "Out Of Stock". |
-| Safety stock, annual demand |  Data only | Stored and validated; unused in calculations. |
-| ABC category |  Data only | Accepts `A`/`B`/`C`; meaning is not defined in the repository. |
-| Expiration |  Data only | `expiry_months`, `expiry_date`, and batch `status` are stored; nothing updates status or flags upcoming expiry. |
-| Stock movement |  Planned | No table, model, or endpoint. |
+| FIFO | Implemented | Dispatch consumes eligible batches ordered by receipt date and ID. |
+| Reorder Point | Implemented | ROP = annual demand / 365 × configured seasonal multiplier × 7-day lead time + safety stock; dashboard alerts compare eligible stock to ROP. |
+| Safety stock, annual demand | Implemented (baseline) | Used in the ROP calculation. |
+| ABC category | Implemented (classification) | A/B/C are stored; a separate manager-configured multiplier expresses seasonal demand so category alone does not assert a seasonal pattern. |
+| Expiration | Implemented (baseline) | Category C dashboard alerts show active batches expiring within seven days. |
+| Stock movement | Implemented (baseline) | Receive/dispatch endpoints create batches and append ledger transactions. |
+| Physical-count reconciliation | Implemented | Manager/Admin selects a batch, records non-negative physical count and required reason; transaction logs signed adjustment and before/after quantities. |
+| Seasonal demand | Implemented (manual policy) | Manager configures per-product seasonal multiplier from 0.1–5; defaults to 1. Existing Category A products retain legacy factor 1.5. No automated historical forecasting or season scheduling is claimed. |
+| Overstock | Implemented (configured limit) | Manager optionally sets a product maximum stock level; dashboard alerts when eligible stock exceeds it. No alert is produced when no limit is configured. |
 
 ## Testing
 
-- **PHPUnit:** configured (in-memory SQLite) but only the two default example tests exist. Run: `docker compose exec backend php artisan test`.
-- **Frontend:** no tests. Lint with `docker compose exec frontend npm run lint`.
+- **PHPUnit:** configured for in-memory SQLite; feature tests cover batch eligibility, FIFO dispatch, insufficient stock, dashboard aggregation/expiry/overstock, seasonal ROP, count audit trail, and manager authorization. Run: `docker compose exec backend php artisan test`.
+- **Frontend:** lint with `docker compose exec frontend npm run lint`; production bundle with `docker compose exec frontend npm run build`.
 - **API / end-to-end tests:** none. The API is verified manually with an HTTP client (curl, Postman, Thunder Client).
 
 ## Git Workflow
@@ -326,8 +365,10 @@ Then open a Pull Request into `develop`, request a review, address comments, and
 | **Port 3306 in use** | Find the process: `Get-NetTCPConnection -LocalPort 3306` then `Get-Process -Id <OwningProcess>`. If it is the local Windows MySQL service, confirm with `Get-Service MySQL80` and, only if it is the conflict and you do not need it, run `Stop-Service MySQL80` (admin PowerShell). Or change the host port in `docker-compose.yml` (e.g. `"3307:3306"`). Ports 80 and 3000 can conflict the same way. |
 | **`vendor/autoload.php` not found** | `docker compose exec backend composer install` |
 | **No application encryption key** | `docker compose exec backend php artisan key:generate` |
-| **DB connection refused / wrong DB** | Check `backend/.env` has `DB_CONNECTION=mysql` and `DB_HOST=db`; then `php artisan config:clear` in the backend container. |
-| **Migrate fails right after startup** | MySQL may still be initializing (no health check). Wait a few seconds and retry. |
+| **DB connection refused / wrong DB** | Check `backend/.env` has `DB_CONNECTION=mysql` and `DB_HOST=db`; then `docker compose exec backend php artisan config:clear`. |
+| **`users` table is missing** | Rebuild is not a migration. Run `make migrate` or `docker compose exec backend php artisan migrate --force`; this applies pending migrations without dropping tables. |
+| **Laravel log permission error** | Compose sends Laravel logs to stderr; inspect with `docker compose logs backend`. Framework runtime files use a managed volume rather than the Windows source bind mount. |
+| **Migrate fails right after startup** | Wait for the MySQL health check to pass (`docker compose ps`), then rerun `make migrate`. |
 | **Changed `frontend/package.json`** | Rebuild: `docker compose up -d --build frontend` (the container keeps its own `node_modules`). |
 | **`lucide-react` import error** | Used by unrouted files but not declared in `frontend/package.json`; add it if you start using them. |
 | **API calls fail** | Browse via `http://localhost`, not `:3000`; the Vite config has no proxy. |
@@ -341,27 +382,28 @@ Be aware (not verified as secure):
 
 - Never commit `.env` files, passwords, tokens, or credentials.
 - `docker-compose.yml` contains plain-text development database passwords; move them to environment files before any shared or production use.
-- There are no roles or permissions on the API: any authenticated user can create, edit, and delete products and batches. The manager/staff screens are not tied to backend roles.
+- Product/user writes and physical count adjustments require manager/admin authorization; receiving and dispatch are available to authenticated users. Review this policy against the deployed workforce model.
 - `POST /api/register` is public, tokens do not expire, and `.env.example` sets `APP_DEBUG=true` (development only).
 - `.vscode/mcp.json` prompts for a FlyonUI license key at runtime; do not paste the key into the file.
 
-## Known Issues
+## Known Issues and Follow-up
 
-1. The frontend does not call the API; login screens navigate to the dashboard without authenticating.
-2. `StaffLogin.jsx` calls `navigate(...)` without importing or defining it, so submitting that form should throw an error.
-3. The add-product form fields (name, category, stock, price, ...) do not match the API's product fields (`sku`, `abc_category`, `unit_cost`, ...), and stock is per product in the UI but per batch in the database.
-4. `make setup` is incomplete on a fresh clone (no `.env`, no `composer install`), and `.env.example` targets SQLite while Docker provides MySQL.
-5. A root-level `node_modules/` appears in the repository; the root `.gitignore` only ignores `/frontend/node_modules`.
-6. `sku` uniqueness is enforced only in validation, not by a database index.
-7. `frontend/README.md` and `backend/README.md` are the default Vite and Laravel template READMEs.
+1. Seasonal factors and overstock limits are explicitly manager-configured;
+   historical seasonal forecasting and automatic season scheduling are not implemented.
+2. The API exposes development registration and long-lived Sanctum tokens;
+   production deployments need environment-specific hardening.
+3. The Compose MySQL service needs a named persistent data volume before it is
+   used where database data must survive container recreation.
+4. Review repository ignore rules and template READMEs separately from runtime
+   fixes; do not mix unrelated cleanup into the inventory correction.
 
 ## Roadmap
 
-**Completed:** Docker environment; Sanctum auth API; product and batch CRUD API; migrations; frontend prototype screens.
+**Implemented:** Docker development environment; Sanctum auth API and protected React routes; product/batch inventory screens and APIs; FIFO receiving/dispatch; reorder and expiry alerts; stock movement reporting; user management; and regression tests for batch eligibility and dispatch.
 
-**In progress:** connecting the frontend to the API.
-
-**Planned:** token storage and route protection in the frontend; align the product form with the API fields; batch screens; FIFO allocation; ROP calculation and alerts; expiry monitoring; stock movement records; reports and user management; real-time visibility; automated tests; production build and deployment configuration.
+**Remaining:** complete broader UI/API acceptance and concurrency tests, repeat
+controlled performance benchmarks, configure persistent MySQL storage, review
+production security, and collect authentic team review/rubric evidence.
 
 ## Contributors and License
 
@@ -370,5 +412,3 @@ Be aware (not verified as secure):
 **License:** no license has been specified for this project. (The Laravel skeleton in `backend/` is MIT-licensed; that does not define this project's license.)
 
 ---
-
-

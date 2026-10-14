@@ -21,6 +21,8 @@ class Product extends Model
         'reorder_point',   // Stock level that triggers a new order
         'safety_stock',  // Buffer stock kept for demand spikes
         'annual_demand',  // Expected units sold per year (used for EOQ)
+        'seasonal_demand_multiplier',
+        'max_stock_level',
         'last_reorder_date',  // When the item was last reordered
     ];
 
@@ -30,6 +32,8 @@ class Product extends Model
         return [
             'unit_cost' => 'decimal:2',  // Keep 2 decimal places for money
             'annual_demand' => 'decimal:2',
+            'seasonal_demand_multiplier' => 'decimal:2',
+            'max_stock_level' => 'integer',
             'last_reorder_date' => 'date',  // Returns a Carbon date instance
         ];
     }
@@ -38,5 +42,13 @@ class Product extends Model
     public function batches(): HasMany
     {
         return $this->hasMany(ProductBatch::class);
+    }
+
+    public function activeBatches(): HasMany
+    {
+        return $this->batches()
+            ->where('status', 'active')
+            ->where('quantity_remaining', '>', 0)
+            ->whereDate('expiry_date', '>=', today());
     }
 }

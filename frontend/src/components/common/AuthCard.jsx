@@ -4,7 +4,7 @@ import { login } from "../../api";
 // Reusable login card with role-based validation and dynamic redirection
 export default function AuthCard({
   allowedRoles = ["manager", "admin", "administrator", "staff"],
-  redirectPath = "/manager-dashboard",
+  redirectPath,
   unauthorizedMessage = "This account is not authorized for this role.",
   onSuccess,
 }) {
@@ -41,7 +41,7 @@ export default function AuthCard({
           onSuccess(data.user);
         } else {
           // # ponytail: dynamic routing based on the role the DB told us, instead of trusting a frontend prompt
-          window.location.href = userRole === 'staff' ? "/dashboard" : "/manager-dashboard";
+          window.location.href = redirectPath || (userRole === 'staff' ? "/dashboard" : "/manager-dashboard");
         }
       })
       .catch((err) => setError(err.message))

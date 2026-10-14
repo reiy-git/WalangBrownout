@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getProductsList, saveProduct } from "../api";
+import { getAvailableStock, getProductsList, saveProduct } from "../api";
 import { formatDate, formatNumber } from "../utils/format";
 import SearchInput from "../components/common/SearchInput";
 import FilterDropdown from "../components/common/FilterDropdown";
@@ -39,11 +39,7 @@ export default function ManagerReorderManagement() {
   const products = useMemo(
     () =>
       rawProducts.map((p) => {
-        const stock = p.stock !== undefined
-          ? Number(p.stock)
-          : Array.isArray(p.batches)
-            ? p.batches.reduce((acc, b) => acc + (Number(b.quantity_remaining) || 0), 0)
-            : 0;
+        const stock = getAvailableStock(p);
         const reorderPoint = Number(p.reorderPoint ?? p.reorder_point ?? 0);
         const safetyStock = Number(p.safetyStock ?? p.safety_stock ?? 0);
         const lastReorderDate = p.lastReorderDate || p.last_reorder_date || "-";
@@ -77,11 +73,22 @@ export default function ManagerReorderManagement() {
 
   const saveSafetyStock = async (event) => {
     event.preventDefault();
-    const value = Number(new FormData(event.currentTarget).get("safety_stock"));
-    if (!Number.isFinite(value) || value < 0) { setSaveError("Safety stock must be zero or greater."); return; }
+    const formData = new FormData(event.currentTarget);
+    const safetyStock = Number(formData.get("safety_stock"));
+    const seasonalMultiplier = Number(formData.get("seasonal_demand_multiplier"));
+    const maxStockInput = formData.get("max_stock_level");
+    const maxStockLevel = maxStockInput === "" ? null : Number(maxStockInput);
+    if (!Number.isInteger(safetyStock) || safetyStock < 0) { setSaveError("Safety stock must be a whole number of zero or greater."); return; }
+    if (!Number.isFinite(seasonalMultiplier) || seasonalMultiplier < 0.1 || seasonalMultiplier > 5) { setSaveError("Seasonal demand factor must be between 0.1 and 5."); return; }
+    if (maxStockLevel !== null && (!Number.isInteger(maxStockLevel) || maxStockLevel < 0)) { setSaveError("Maximum stock must be a whole number of zero or greater."); return; }
     try {
       setSaveError("");
-      await saveProduct({ ...editingProduct, safety_stock: value });
+      await saveProduct({
+        ...editingProduct,
+        safety_stock: safetyStock,
+        seasonal_demand_multiplier: seasonalMultiplier,
+        max_stock_level: maxStockLevel,
+      });
       setEditingProduct(null);
       setLoading(true);
       setRawProducts(await getProductsList());
@@ -121,7 +128,7 @@ export default function ManagerReorderManagement() {
           onClick={() => navigate("/inventory-list")}
           className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium gap-1 px-3.5 rounded-lg shadow-sm text-xs"
         >
-          ✦ View Inventory
+          View Inventory
         </button>
       </div>
 
@@ -322,7 +329,7 @@ export default function ManagerReorderManagement() {
           </button>
         </div>}
       </div>
-      {editingProduct && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true"><form onSubmit={saveSafetyStock} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-lg font-bold text-[#2e1065]">Edit Reorder Point</h2><p className="mt-1 text-sm text-[#4c1d95]">{editingProduct.name}</p><div className="mt-4 grid grid-cols-2 gap-3 text-sm"><p>Current stock: <b>{formatNumber(editingProduct.stock)}</b></p><p>Current ROP: <b>{formatNumber(editingProduct.reorderPoint)}</b></p></div><label className="form-control mt-4"><span className="label-text text-xs">Safety stock</span><input name="safety_stock" className="input input-bordered input-sm" type="number" min="0" defaultValue={editingProduct.safetyStock} required /></label><p className="mt-2 min-h-5 text-xs text-rose-600">{saveError}</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setEditingProduct(null)} className="btn btn-sm btn-ghost">Cancel</button><button type="submit" className="btn btn-sm border-0 bg-[#8b7fd6] text-white">Save ROP</button></div></form></div>}
+      {editingProduct && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true"><form onSubmit={saveSafetyStock} className="w-full max-w-md rounded-2xl bg-white p-6 text-slate-900 shadow-2xl"><h2 className="text-lg font-bold text-[#2e1065]">Edit Reorder Controls</h2><p className="mt-1 text-sm text-[#4c1d95]">{editingProduct.name}</p><div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-700"><p>Current stock: <b className="text-slate-900">{formatNumber(editingProduct.stock)}</b></p><p>Current ROP: <b className="text-slate-900">{formatNumber(editingProduct.reorderPoint)}</b></p></div><label className="form-control mt-4"><span className="label-text text-xs font-medium text-slate-700">Safety stock</span><input name="safety_stock" className="input input-bordered input-sm border-slate-400 bg-white text-slate-900" type="number" min="0" step="1" defaultValue={editingProduct.safetyStock} required /></label><label className="form-control mt-3"><span className="label-text text-xs font-medium text-slate-700">Seasonal demand factor (0.1–5)</span><input name="seasonal_demand_multiplier" className="input input-bordered input-sm border-slate-400 bg-white text-slate-900" type="number" min="0.1" max="5" step="0.01" defaultValue={editingProduct.seasonal_demand_multiplier ?? 1} required /></label><label className="form-control mt-3"><span className="label-text text-xs font-medium text-slate-700">Maximum stock level (blank disables overstock alert)</span><input name="max_stock_level" className="input input-bordered input-sm border-slate-400 bg-white text-slate-900" type="number" min="0" step="1" defaultValue={editingProduct.max_stock_level ?? ""} /></label><p className="mt-2 min-h-5 text-xs text-rose-700">{saveError}</p><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setEditingProduct(null)} className="btn btn-sm btn-ghost text-slate-800">Cancel</button><button type="submit" className="btn btn-sm border-0 bg-violet-700 text-white hover:bg-violet-800">Save Controls</button></div></form></div>}
     </main>
   );
 }

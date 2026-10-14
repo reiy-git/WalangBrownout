@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Menu, LogOut, Home, ClipboardList, ShoppingCart, Users, FileText } from "lucide-react";
 import Sidebar from "./Sidebar";
@@ -22,15 +22,13 @@ const STAFF_MENU_ITEMS = [
 export default function DashboardLayout({ staffName = "Admin", avatarUrl = "", onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const menuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   const userRole = (localStorage.getItem("user_role") || "").toLowerCase();
   const isStaff = userRole === "staff" || location.pathname === "/dashboard";
   const menuItems = isStaff ? STAFF_MENU_ITEMS : MANAGER_MENU_ITEMS;
-  const displayName = localStorage.getItem("user_name") || (isStaff ? "Staff" : "Admin");
+  const displayName = localStorage.getItem("user_name") || staffName || (isStaff ? "Staff" : "Admin");
 
   // Trigger logout action
   const handleLogout = async () => {
@@ -60,17 +58,6 @@ export default function DashboardLayout({ staffName = "Admin", avatarUrl = "", o
     setSidebarOpen(false);
   };
 
-  // Close the profile dropdown when clicking outside of it
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setProfileMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   return (
     <div className="min-h-screen w-full bg-[#ede9fe]/30 font-sans flex overflow-hidden">
       <Sidebar
@@ -95,7 +82,7 @@ export default function DashboardLayout({ staffName = "Admin", avatarUrl = "", o
             <span className="font-bold text-sm text-[#2e1065] tracking-wide sm:hidden">IMS</span>
           </div>
 
-          <div className="flex items-center gap-3" ref={menuRef}>
+          <div className="flex items-center gap-3">
             <div className="avatar">
               <div className="w-8 h-8 rounded-full ring ring-[#c4b5fd] ring-offset-base-100 ring-offset-2 overflow-hidden bg-white flex items-center justify-center">
                 {avatarUrl ? (

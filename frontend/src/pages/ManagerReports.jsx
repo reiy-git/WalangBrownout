@@ -65,13 +65,6 @@ export default function ManagerReports() {
     <main className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 relative z-10 w-full pb-12 flex-1 flex flex-col font-sans">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065]">Reports</h1>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="btn btn-sm bg-[#8b7fd6] hover:bg-[#8b7fd6]/90 border-0 text-white font-medium gap-1 px-3.5 rounded-lg shadow-sm text-xs"
-        >
-          📄 Print Report
-        </button>
       </div>
 
       {/* Tabs */}
@@ -126,7 +119,7 @@ export default function ManagerReports() {
               {filteredTransactions.map((tx, idx) => (
                 <tr key={tx.id || idx} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30">
                   <td>{formatDateTime(tx.timestamp || tx.date)}</td>
-                  <td className={tx.type === "Received" ? "text-emerald-600 font-semibold" : "text-rose-500 font-semibold"}>
+                  <td className={tx.transaction_type === "count_adjustment" ? "text-violet-600 font-semibold" : tx.type === "Received" ? "text-emerald-600 font-semibold" : "text-rose-500 font-semibold"}>
                     {tx.typeLabel}
                   </td>
                   <td>{tx.productName}</td>

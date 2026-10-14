@@ -32,7 +32,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin/Manager routes
     Route::middleware('manager')->group(function () {
         Route::apiResource('users', UserController::class);
-        Route::apiResource('product-batches', ProductBatchController::class)->except(['store']);
+        Route::get('/product-batches', [ProductBatchController::class, 'index']);
+        Route::get('/product-batches/{productBatch}', [ProductBatchController::class, 'show']);
+        Route::post('/product-batches/{productBatch}/count', [InventoryLedgerController::class, 'reconcileCount']);
         Route::apiResource('products', ProductController::class)->except(['index', 'show']);
     });
 
@@ -40,4 +42,3 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('products', ProductController::class)->only(['index', 'show']);
     Route::get('/transactions', [InventoryLedgerController::class, 'index']);
 });
-
