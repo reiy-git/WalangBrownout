@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { computeStatus, getProductsList, saveProduct, recordReceiveStock, recordDispatchStock } from "../api";
 import { formatCurrency, formatDate, formatNumber } from "../utils/format";
 import FilterDropdown from "../components/common/FilterDropdown";
@@ -15,6 +15,9 @@ export default function ManagerInventoryList() {
   const [modal, setModal] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+
+  const hasFetched = useRef(false);
+
   const isManager = ["manager", "admin", "administrator"].includes(
     (localStorage.getItem("user_role") || "").toLowerCase(),
   );
@@ -31,7 +34,10 @@ export default function ManagerInventoryList() {
     }
   }, []);
 
+  // Load product list once on mount
   useEffect(() => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
     refreshProducts();
   }, [refreshProducts]);
 
