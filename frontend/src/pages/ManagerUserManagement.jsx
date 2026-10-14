@@ -1,13 +1,11 @@
 // Manager user management directory with search, filter, and pagination
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getUsersList, deleteUserById, saveUser } from '../api';
 import { TableSkeleton } from '../components/common/Skeleton';
 
 const PAGE_SIZE = 5;
 
 export default function ManagerUserManagement() {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -68,7 +66,7 @@ export default function ManagerUserManagement() {
   );
 
   const activeFilterCount = (roleFilter !== "All" ? 1 : 0) + (statusFilter !== "All" ? 1 : 0);
-  
+
   // Reset all active filter selections
   const clearFilters = () => { setRoleFilter("All"); setStatusFilter("All"); };
 
@@ -284,7 +282,7 @@ export default function ManagerUserManagement() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-[#d8b4fe]/50 animate-in fade-in zoom-in duration-150">
             <h3 className="text-base font-bold text-[#2e1065] mb-2">Confirm Delete User</h3>
-            <p className="text-xs text-[#4c1d95]/80 mb-6">
+            <p className="text-xs text-[#4c1d95] mb-6">
               Are you sure you want to delete user <span className="font-bold text-[#2e1065]">{userToDelete.displayName}</span>? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2.5">
@@ -308,17 +306,17 @@ export default function ManagerUserManagement() {
       )}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true">
-          <form onSubmit={submitUser} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <form onSubmit={submitUser} className="w-full max-w-md rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
             <h2 className="text-lg font-bold text-[#2e1065]">{editingUser.id ? "Edit User" : "Add New User"}</h2>
             <div className="mt-4 grid gap-3">
-              <label className="form-control"><span className="label-text text-xs">Full name</span><input name="name" className="input input-bordered input-sm" defaultValue={editingUser.name || editingUser.displayName || ""} required /></label>
-              <label className="form-control"><span className="label-text text-xs">Email</span><input name="email" type="email" className="input input-bordered input-sm" defaultValue={editingUser.email || ""} required /></label>
-              <label className="form-control"><span className="label-text text-xs">Role</span><select name="role" className="select select-bordered select-sm" defaultValue={editingUser.role || "staff"}><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></label>
-              <label className="form-control"><span className="label-text text-xs">{editingUser.id ? "New password (leave blank to keep current)" : "Password"}</span><input name="password" type="password" className="input input-bordered input-sm" minLength="6" /></label>
-              <label className="label cursor-pointer justify-start gap-2"><input name="active" type="checkbox" className="checkbox checkbox-sm" defaultChecked={editingUser.active !== false && editingUser.active !== 0} /><span className="label-text">Active account</span></label>
+              <label className="form-control"><span className="label-text text-xs font-medium text-slate-700">Full name</span><input name="name" className="input input-bordered input-sm border-slate-400 bg-white text-slate-900" defaultValue={editingUser.name || editingUser.displayName || ""} required /></label>
+              <label className="form-control"><span className="label-text text-xs font-medium text-slate-700">Email</span><input name="email" type="email" className="input input-bordered input-sm border-slate-400 bg-white text-slate-900" defaultValue={editingUser.email || ""} required /></label>
+              <label className="form-control"><span className="label-text text-xs font-medium text-slate-700">Role</span><select name="role" className="select select-bordered select-sm border-slate-400 bg-white text-slate-900" defaultValue={editingUser.role || "staff"}><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></label>
+              <label className="form-control"><span className="label-text text-xs font-medium text-slate-700">{editingUser.id ? "New password (leave blank to keep current)" : "Password"}</span><input name="password" type="password" className="input input-bordered input-sm border-slate-400 bg-white text-slate-900" minLength="6" /></label>
+              <label className="label cursor-pointer justify-start gap-2"><input name="active" type="checkbox" className="checkbox checkbox-sm" defaultChecked={editingUser.active !== false && editingUser.active !== 0} /><span className="label-text text-sm font-medium text-slate-800">Active account</span></label>
             </div>
-            <p className="mt-2 min-h-5 text-xs text-rose-600">{formError}</p>
-            <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setEditingUser(null)} className="btn btn-sm btn-ghost">Cancel</button><button type="submit" className="btn btn-sm border-0 bg-[#8b7fd6] text-white">Save User</button></div>
+            <p className="mt-2 min-h-5 text-xs text-rose-700">{formError}</p>
+            <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setEditingUser(null)} className="btn btn-sm btn-ghost text-slate-800">Cancel</button><button type="submit" className="btn btn-sm border-0 bg-violet-700 text-white hover:bg-violet-800">Save User</button></div>
           </form>
         </div>
       )}

@@ -5,6 +5,10 @@ const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 // mutations wipe matching keys so the next GET is fresh. No TTL until stale data is a real problem.
 const _cache = {};
 
+function clearCache() {
+  for (const key of Object.keys(_cache)) delete _cache[key];
+}
+
 // Return cached data if we have it, otherwise fetch and store
 async function cachedRequest(endpoint, options = {}) {
   if (_cache[endpoint]) return _cache[endpoint];
@@ -39,7 +43,7 @@ async function request(endpoint, options = {}) {
   const text = await res.text();
   let data = {};
   if (text.trim()) {
-    try { data = JSON.parse(text); } 
+    try { data = JSON.parse(text); }
     catch { data = { message: text.replace(/<[^>]+>/g, "").trim() }; }
   }
   if (!res.ok) throw new Error(data.message || res.statusText || "Request failed");
@@ -48,13 +52,18 @@ async function request(endpoint, options = {}) {
 
 // Authenticate user with credentials
 export async function login({ email, password }) {
-  return await request("/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  const data = await request("/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  clearCache();
+  return data;
 }
 
 // Revoke current authentication token and clear local session
 export async function logout() {
-  try { await request("/logout", { method: "POST" }); } 
-  finally { localStorage.removeItem("auth_token"); }
+  try { await request("/logout", { method: "POST" }); }
+  finally {
+    localStorage.removeItem("auth_token");
+    clearCache();
+  }
 }
 
 // Fetch currently logged-in user profile
@@ -66,6 +75,22 @@ export async function getCurrentUser() {
 export function computeStatus(stock, reorderPoint) {
   const s = Number(stock) || 0, r = Number(reorderPoint) || 0;
   return s <= 0 ? "Out Of Stock" : s <= r ? "Low Stock" : "In Stock";
+}
+
+export function getAvailableStock(product) {
+  if (product.stock !== undefined) return Number(product.stock) || 0;
+  if (!Array.isArray(product.batches)) return 0;
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return product.batches.reduce((total, batch) => {
+    const remaining = Number(batch.quantity_remaining) || 0;
+    const expiryDate = String(batch.expiry_date || "").slice(0, 10);
+
+    return batch.status === "active" && expiryDate >= today && remaining > 0
+      ? total + remaining
+      : total;
+  }, 0);
 }
 
 // Fetch list of all inventory products (cached until a mutation clears it)
@@ -155,17 +180,28 @@ export async function recordDispatchStock({ productId, quantity, department, not
   return res;
 }
 
+export async function recordStockCount({ batchId, quantity, reason }) {
+  const res = await request(`/product-batches/${batchId}/count`, {
+    method: "POST",
+    body: JSON.stringify({ quantity: Number(quantity), reason }),
+  });
+  invalidate("/products");
+  invalidate("/transactions");
+  invalidate("/v1/dashboard");
+  window.dispatchEvent(new Event("ims_transactions_updated"));
+  return res;
+}
+
 // Fetch dashboard metrics, feeds, and alerts (cached)
 export async function getDashboardData() {
-  const [summary, panel1, panel2] = await Promise.all([
+  const [summary, panel2] = await Promise.all([
     cachedRequest("/v1/dashboard/summary"),
-    cachedRequest("/v1/dashboard/panel1?limit=10"),
     cachedRequest("/v1/dashboard/panel2"),
   ]);
   return {
     summary,
-    panel1: panel1.panel1 || [],
     reorderAlerts: panel2.reorder_alerts || [],
     expiryAlerts: panel2.expiry_alerts || [],
+    overstockAlerts: panel2.overstock_alerts || [],
   };
 }

@@ -4,10 +4,9 @@ import { formatCurrency, formatDateTime, formatNumber } from "../utils/format";
 
 const SUMMARY_FALLBACKS = [
   "Total Products",
-  "Low Stock Items",
-  "Reorder Alerts",
-  "Total Active Users",
-  "Today Reports",
+  "Low Stock Alerts",
+  "Expiring Soon (Category C)",
+  "Total Inventory Value",
 ];
 
 export default function ManagerDashboard() {
@@ -54,8 +53,8 @@ export default function ManagerDashboard() {
       <h1 className="text-xl sm:text-2xl font-bold text-[#2e1065] mb-6">Dashboard Summary</h1>
       {error && <div className="alert alert-error mb-6 text-sm" role="alert">{error}</div>}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-8">
-        {Array.from({ length: 5 }, (_, index) => {
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        {Array.from({ length: SUMMARY_FALLBACKS.length }, (_, index) => {
           const item = summary[`summary_item_${index + 1}`] || {};
           const label = item.label || SUMMARY_FALLBACKS[index];
           const rawVal = item.value ?? 0;
@@ -80,8 +79,9 @@ export default function ManagerDashboard() {
               <thead><tr className="text-[#2e1065] border-b border-[#d8b4fe]/50 bg-[#ede9fe]/50"><th>Date &amp; Time</th><th>Type</th><th>Product</th><th>Quantity</th></tr></thead>
               <tbody className="text-xs text-[#4c1d95]">
                 {transactions.slice(0, 10).map((transaction, index) => {
-                  const type = transaction.type === "Received" ? "Receive" : "Dispatch";
-                  return <tr key={transaction.id || index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30"><td>{formatDateTime(transaction.timestamp || transaction.date)}</td><td className={type === "Receive" ? "text-emerald-600" : "text-rose-500"}>{type}</td><td>{transaction.productName || "Unknown Product"}</td><td>{formatNumber(transaction.quantity)}</td></tr>;
+                  const type = transaction.type || "Transaction";
+                  const color = type === "Received" ? "text-emerald-600" : type === "Count Adjusted" ? "text-violet-600" : "text-rose-500";
+                  return <tr key={transaction.id || index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30"><td>{formatDateTime(transaction.timestamp || transaction.date)}</td><td className={color}>{type}</td><td>{transaction.productName || "Unknown Product"}</td><td>{formatNumber(transaction.quantity)}</td></tr>;
                 })}
                 {!transactions.length && <tr><td colSpan={4} className="py-8 text-center text-[#2e1065]/60">No transactions yet.</td></tr>}
               </tbody>
@@ -101,6 +101,14 @@ export default function ManagerDashboard() {
               <span className={`badge badge-sm font-bold border-0 ${className}`}>{description}</span>
             </div>
           ))}
+          <h2 className="mt-2 text-sm sm:text-base font-bold text-[#2e1065]">Overstock Alerts</h2>
+          {(dashboard?.overstockAlerts || []).map((alert) => (
+            <div key={alert.sku} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <b>{alert.name}</b>
+              <p>{formatNumber(alert.current_stock)} in stock; configured max {formatNumber(alert.max_stock_level)} ({formatNumber(alert.excess_quantity)} over)</p>
+            </div>
+          ))}
+          {!(dashboard?.overstockAlerts || []).length && <p className="rounded-xl bg-white p-3 text-xs text-[#4c1d95]/70">No products exceed their configured maximum stock.</p>}
         </section>
       </div>
     </main>

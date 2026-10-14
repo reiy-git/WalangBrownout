@@ -12,7 +12,11 @@ export function enrichTransaction(tx, products = []) {
     user: tx.user || "Admin",
     productId: tx.productId || product?.id || "N/A",
     amount,
-    typeLabel: tx.type === "Received" || tx.transaction_type === "receive" ? "Receive" : "Dispatch",
+    typeLabel: tx.transaction_type === "count_adjustment"
+      ? "Count Adjustment"
+      : tx.type === "Received" || tx.transaction_type === "receive"
+        ? "Receive"
+        : "Dispatch",
   };
 }
 

@@ -88,10 +88,11 @@ class DatabaseSeeder extends Seeder
                 'reorder_point' => $rop,
                 'safety_stock' => $item['safety'],
                 'annual_demand' => $item['demand'],
+                'seasonal_demand_multiplier' => $multiplier,
                 'last_reorder_date' => now()->subDays($item['received'])->toDateString(),
             ]);
 
-            $batch = ProductBatch::updateOrCreate(['batch_number' => 'WBA-2026-' . str_pad((string) ($index + 10), 3, '0', STR_PAD_LEFT)], [
+            $batch = ProductBatch::updateOrCreate(['batch_number' => 'WBA-2026-'.str_pad((string) ($index + 10), 3, '0', STR_PAD_LEFT)], [
                 'product_id' => $product->id,
                 'date_received' => now()->subDays($item['received'])->toDateString(),
                 'quantity_received' => $item['quantity'],
@@ -134,6 +135,7 @@ class DatabaseSeeder extends Seeder
                 'reorder_point' => 20,
                 'safety_stock' => 10,
                 'annual_demand' => 500.00,
+                'seasonal_demand_multiplier' => 1.5,
                 'last_reorder_date' => now()->subDays(15)->toDateString(),
             ]
         );
@@ -148,6 +150,7 @@ class DatabaseSeeder extends Seeder
                 'reorder_point' => 15,
                 'safety_stock' => 8,
                 'annual_demand' => 240.00,
+                'seasonal_demand_multiplier' => 1.0,
                 'last_reorder_date' => now()->subDays(30)->toDateString(),
             ]
         );
@@ -162,6 +165,7 @@ class DatabaseSeeder extends Seeder
                 'reorder_point' => 25,
                 'safety_stock' => 10,
                 'annual_demand' => 800.00,
+                'seasonal_demand_multiplier' => 1.0,
                 'last_reorder_date' => now()->subDays(5)->toDateString(),
             ]
         );
@@ -176,6 +180,7 @@ class DatabaseSeeder extends Seeder
                 'reorder_point' => 15,
                 'safety_stock' => 8,
                 'annual_demand' => 600.00,
+                'seasonal_demand_multiplier' => 1.5,
                 'last_reorder_date' => now()->subDays(40)->toDateString(),
             ]
         );
@@ -267,4 +272,3 @@ class DatabaseSeeder extends Seeder
         );
     }
 }
-

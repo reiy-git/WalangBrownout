@@ -3,3 +3,9 @@ RUN apt-get update && apt-get install -y git curl libpng-dev libonig-dev libxml2
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
+
+# Pre-create framework runtime paths so Docker's named volume inherits
+# permissions suitable for Laravel's PHP-FPM worker.
+RUN mkdir -p vendor storage/framework/cache/data storage/framework/sessions \
+    storage/framework/testing storage/framework/views \
+    && chown -R www-data:www-data storage/framework

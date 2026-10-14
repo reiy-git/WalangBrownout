@@ -166,7 +166,7 @@ export default function PhotoCropModal({ src, onCancel, onSave }) {
           />
         </div>
 
-        <p className="text-[9px] text-violet-500 text-center mt-2">
+        <p className="text-[9px] text-violet-700 text-center mt-2">
           Drag to reposition &middot; use the slider to zoom
         </p>
 

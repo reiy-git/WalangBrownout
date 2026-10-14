@@ -16,23 +16,25 @@ class DashboardController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $totalProducts = Product::count();
-        $lowStockCount = $this->lowStockProducts()->get()->count();
+        $lowStockCount = $this->lowStockProducts()->count();
 
         $expiringSoonCount = ProductBatch::where('status', 'active')
+            ->where('quantity_remaining', '>', 0)
             ->whereHas('product', fn ($q) => $q->where('abc_category', 'C'))
-            ->whereBetween('expiry_date', [now(), now()->addDays(7)])
+            ->whereBetween('expiry_date', [today()->toDateString(), today()->addDays(7)->toDateString()])
             ->count();
 
         $totalInventoryValue = ProductBatch::join('products', 'products.id', '=',
             'product_batches.product_id')
             ->where('product_batches.status', 'active')
+            ->where('product_batches.quantity_remaining', '>', 0)
+            ->whereDate('product_batches.expiry_date', '>=', today())
             ->sum(DB::raw('product_batches.quantity_remaining * products.unit_cost'));
 
         return response()->json([
             'summary_item_1' => ['label' => 'Total Products', 'value' => $totalProducts],
             'summary_item_2' => ['label' => 'Low Stock Alerts', 'value' => $lowStockCount],
-            'summary_item_3' => ['label' => 'Expiring Soon (Category C)', 'value' =>
-                $expiringSoonCount],
+            'summary_item_3' => ['label' => 'Expiring Soon (Category C)', 'value' => $expiringSoonCount],
             'summary_item_4' => ['label' => 'Total Inventory Value', 'value' => round((float)
                 $totalInventoryValue, 2)],
         ]);
@@ -67,7 +69,7 @@ class DashboardController extends Controller
     public function panel2(Request $request): JsonResponse
     {
         $reorderAlerts = $this->lowStockProducts()->get()->map(function (Product $product) {
-            $currentStock = (int) $product->activeBatches()->sum('quantity_remaining');
+            $currentStock = (int) $product->current_stock;
 
             return [
                 'sku' => $product->sku,
@@ -82,8 +84,9 @@ class DashboardController extends Controller
 
         $expiryAlerts = ProductBatch::with('product')
             ->where('status', 'active')
+            ->where('quantity_remaining', '>', 0)
             ->whereHas('product', fn ($q) => $q->where('abc_category', 'C'))
-            ->whereBetween('expiry_date', [now(), now()->addDays(7)])
+            ->whereBetween('expiry_date', [today()->toDateString(), today()->addDays(7)->toDateString()])
             ->orderBy('expiry_date')
             ->get()
             ->map(function (ProductBatch $batch) {
@@ -96,9 +99,26 @@ class DashboardController extends Controller
                 ];
             });
 
+        $overstockAlerts = Product::select('products.*')
+            ->leftJoinSub($this->eligibleStockTotals(), 'stock_totals', function ($join) {
+                $join->on('stock_totals.product_id', '=', 'products.id');
+            })
+            ->selectRaw('COALESCE(stock_totals.current_stock, 0) AS current_stock')
+            ->whereNotNull('products.max_stock_level')
+            ->whereRaw('COALESCE(stock_totals.current_stock, 0) > products.max_stock_level')
+            ->get()
+            ->map(fn (Product $product) => [
+                'sku' => $product->sku,
+                'name' => $product->name,
+                'current_stock' => (int) $product->current_stock,
+                'max_stock_level' => $product->max_stock_level,
+                'excess_quantity' => (int) $product->current_stock - $product->max_stock_level,
+            ]);
+
         return response()->json([
             'reorder_alerts' => $reorderAlerts,
             'expiry_alerts' => $expiryAlerts,
+            'overstock_alerts' => $overstockAlerts,
         ]);
     }
 
@@ -107,13 +127,21 @@ class DashboardController extends Controller
     private function lowStockProducts()
     {
         return Product::select('products.*')
-            ->whereRaw(
-                '(SELECT COALESCE(SUM(quantity_remaining), 0)
-                    FROM product_batches
-                    WHERE product_batches.product_id = products.id
-                    AND product_batches.status = ?) <= products.reorder_point',
-                ['active']
-            );
+            ->leftJoinSub($this->eligibleStockTotals(), 'stock_totals', function ($join) {
+                $join->on('stock_totals.product_id', '=', 'products.id');
+            })
+            ->selectRaw('COALESCE(stock_totals.current_stock, 0) AS current_stock')
+            ->whereRaw('COALESCE(stock_totals.current_stock, 0) <= products.reorder_point');
+    }
+
+    private function eligibleStockTotals()
+    {
+        return ProductBatch::query()
+            ->select('product_id')
+            ->selectRaw('SUM(quantity_remaining) AS current_stock')
+            ->where('status', 'active')
+            ->where('quantity_remaining', '>', 0)
+            ->whereDate('expiry_date', '>=', today())
+            ->groupBy('product_id');
     }
 }
-

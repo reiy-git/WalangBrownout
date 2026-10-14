@@ -18,7 +18,6 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:8',
         ]);
-        
         // Save the new user record
         $user = User::create([
             'name' => $request->name,
@@ -45,7 +44,7 @@ class AuthController extends Controller
         ]);
         // Look up the account by email
         $user = User::where('email', $request->email)->first();
-        
+
         if ((!$user)) {
             return response()->json([
                 'message' => 'No user found!'

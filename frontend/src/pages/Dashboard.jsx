@@ -87,11 +87,11 @@ export default function Dashboard() {
             </thead>
             <tbody className="text-xs text-[#4c1d95]">
               {transactions.slice(0, 10).map((transaction, index) => {
-                const type = transaction.type === "Received" ? "Receive" : "Dispatch";
+                const type = transaction.type || "Transaction";
                 return (
                   <tr key={transaction.id || index} className="border-b border-[#d8b4fe]/30 hover:bg-[#ede9fe]/30">
                     <td>{formatDateTime(transaction.timestamp || transaction.date)}</td>
-                    <td className={type === "Receive" ? "text-emerald-600" : "text-rose-500"}>{type}</td>
+                    <td className={type === "Received" ? "text-emerald-600" : type === "Count Adjusted" ? "text-violet-600" : "text-rose-500"}>{type}</td>
                     <td>{transaction.productName || "Unknown Product"}</td>
                     <td>{formatNumber(transaction.quantity)}</td>
                   </tr>
@@ -111,5 +111,3 @@ export default function Dashboard() {
     </main>
   );
 }
-
-

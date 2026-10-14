@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(
+            fn (Request $request) => null
+        );
+
         $middleware->alias([
             'manager' => \App\Http\Middleware\EnsureManagerOrAdmin::class,
         ]);

@@ -15,6 +15,9 @@ class InventoryLedger extends Model
         'user_id',
         'transaction_type',
         'quantity',
+        'notes',
+        'quantity_before',
+        'quantity_after',
         'timestamp',
     ];
 
@@ -23,6 +26,8 @@ class InventoryLedger extends Model
     {
         return [
             'quantity' => 'integer',
+            'quantity_before' => 'integer',
+            'quantity_after' => 'integer',
             'timestamp' => 'datetime',
         ];
     }
