@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Services\ReorderPointService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
-    /**
-     * Display a listing of products.
-     */
+    // Get all products along with their batches
     public function index(): JsonResponse
     {
         $products = Product::with('batches')->get();
@@ -18,10 +17,8 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
-    /**
-     * Store a newly created product.
-     */
-    public function store(Request $request): JsonResponse
+    // Save a new product to the database
+    public function store(Request $request, ReorderPointService $reorderPointService): JsonResponse
     {
         $validated = $request->validate([
             'sku' => 'required|string|max:50|unique:products,sku',
@@ -29,13 +26,18 @@ class ProductController extends Controller
             'unit_cost' => 'required|numeric|min:0',
             'abc_category' => 'required|in:A,B,C',
             'expiry_months' => 'required|integer|min:0',
-            'reorder_point' => 'required|integer|min:0',
+            'reorder_point' => 'sometimes|integer|min:0',
             'safety_stock' => 'required|integer|min:0',
             'annual_demand' => 'required|numeric|min:0',
+            'seasonal_demand_multiplier' => 'sometimes|required|numeric|min:0.1|max:5',
+            'max_stock_level' => 'nullable|integer|min:0',
             'last_reorder_date' => 'nullable|date',
         ]);
 
-        $product = Product::create($validated);
+        $validated['seasonal_demand_multiplier'] ??= 1.0;
+        $product = new Product($validated);
+        $product->reorder_point = (int) round($reorderPointService->calculate($product));
+        $product->save();
 
         return response()->json([
             'message' => 'Product created successfully.',
@@ -43,9 +45,7 @@ class ProductController extends Controller
         ], 201);
     }
 
-    /**
-     * Display the specified product.
-     */
+    // Fetch a single product and its batches
     public function show(Product $product): JsonResponse
     {
         $product->load('batches');
@@ -53,24 +53,26 @@ class ProductController extends Controller
         return response()->json($product);
     }
 
-    /**
-     * Update the specified product.
-     */
-    public function update(Request $request, Product $product): JsonResponse
+    // Update product info
+    public function update(Request $request, Product $product, ReorderPointService $reorderPointService): JsonResponse
     {
         $validated = $request->validate([
-            'sku' => 'sometimes|required|string|max:50|unique:products,sku,' . $product->id,
+            'sku' => 'sometimes|required|string|max:50|unique:products,sku,'.$product->id,
             'name' => 'sometimes|required|string|max:255',
             'unit_cost' => 'sometimes|required|numeric|min:0',
             'abc_category' => 'sometimes|required|in:A,B,C',
             'expiry_months' => 'sometimes|required|integer|min:0',
-            'reorder_point' => 'sometimes|required|integer|min:0',
+            'reorder_point' => 'sometimes|integer|min:0',
             'safety_stock' => 'sometimes|required|integer|min:0',
             'annual_demand' => 'sometimes|required|numeric|min:0',
+            'seasonal_demand_multiplier' => 'sometimes|required|numeric|min:0.1|max:5',
+            'max_stock_level' => 'nullable|integer|min:0',
             'last_reorder_date' => 'nullable|date',
         ]);
 
-        $product->update($validated);
+        $product->fill($validated);
+        $product->reorder_point = (int) round($reorderPointService->calculate($product));
+        $product->save();
 
         return response()->json([
             'message' => 'Product updated successfully.',
@@ -78,9 +80,7 @@ class ProductController extends Controller
         ]);
     }
 
-    /**
-     * Remove the specified product.
-     */
+    // Delete a product from inventory
     public function destroy(Product $product): JsonResponse
     {
         $product->delete();

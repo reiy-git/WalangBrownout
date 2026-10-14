@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+    // Create personal access tokens table for Sanctum
     public function up(): void
     {
         Schema::create('personal_access_tokens', function (Blueprint $table) {
@@ -23,9 +21,7 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
+    // Drop personal access tokens table
     public function down(): void
     {
         Schema::dropIfExists('personal_access_tokens');
